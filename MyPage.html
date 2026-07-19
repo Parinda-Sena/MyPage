@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>CV & Interactive Raster Graphics (Arrow Keys Only)</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ส่วนของ CV ด้านซ้ายมือ */
+        .cv-container {
+            width: 350px;
+            background-color: #ffffff;
+            padding: 30px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            z-index: 10;
+        }
+
+        .cv-container h1, .cv-container h2 {
+            color: #333;
+        }
+
+        .cv-container ul {
+            padding-left: 20px;
+        }
+
+        .instructions {
+            background-color: #eef2f7;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+
+        .mode-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            background-color: #007bff;
+            color: white;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        /* ส่วนของ Canvas ด้านขวามือ */
+        #canvas-container {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #222;
+            padding: 20px;
+        }
+
+        canvas {
+            border: 2px solid #555;
+            background-color: #000;
+            image-rendering: pixelated;
+            width: 600px;
+            height: 600px; 
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ================= ส่วนที่ 1: หน้า CV  ================= -->
+    <div class="cv-container">
+        <h1>CV</h1>
+        <h2>[นางสาวปริณดา เสนา]</h2>
+        <p><strong>สาขา:</strong> วิทยาการคอมพิวเตอร์</p>
+        <p><strong>อีเมล:</strong> parinda.se@ku.th</p>
+        
+        <hr>
+        
+        <h3>Interactive Computer Graphics</h3>
+        
+        <div class="instructions">
+            <strong>⌨️ เลือกโหมดควบคุม:</strong><br>
+            กดเลข <kbd>1</kbd> : โหมด Translate (เลื่อน)<br>
+            กดเลข <kbd>2</kbd> : โหมด Rotate (หมุน)<br>
+            กดเลข <kbd>3</kbd> : โหมด Scale (ย่อ/ขยาย)<br>
+            <br>
+            <strong>🎮 โหมดปัจจุบันคือ:</strong><br>
+            <span id="current-mode-text" class="mode-badge">Translate Mode</span>
+            
+            <hr style="border: 0; border-top: 1px solid #ccc; margin: 10px 0;">
+            
+            <strong>🕹️ วิธีใช้งานปุ่มลูกศร:</strong>
+            <ul id="dynamic-instruction">
+                <li>ลูกศร ซ้าย/ขวา/ขึ้น/ลง : เลื่อนตำแหน่ง Sprite</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ================= ส่วนที่ 2: พื้นที่วาดกราฟิก (Canvas) ================= -->
+    <div id="canvas-container">
+        <canvas id="canvas" width="200" height="200"></canvas>
+    </div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let imageData = ctx.createImageData(canvas.width, canvas.height);
+let data = imageData.data;
+
+function putPixel(x, y, r, g, b, a=255) {
+    if (x >= 0 && x < canvas.width && y >= 0 && y < canvas.height) {
+        const index = (y * canvas.width + x) * 4;
+        data[index] = r;
+        data[index + 1] = g;
+        data[index + 2] = b;
+        data[index + 3] = a;
+    }
+}
+
+// Sprite
+const spaceInvaderSprite = [
+    [0, 0, 1, 0, 0, 1, 0, 0],
+    [0, 0, 0, 1, 1, 0, 0, 0],
+    [0, 0, 1, 1, 1, 1, 0, 0],
+    [0, 1, 1, 1, 1, 1, 1, 0],
+    [1, 1, 0, 1, 1, 0, 1, 1],
+    [1, 1, 1, 1, 1, 1, 1, 1],
+    [1, 0, 1, 0, 0, 1, 0, 1],
+    [0, 1, 0, 1, 1, 0, 1, 0],
+];
+
+// --- สถานะสำหรับ Transformation ---
+let posX = 100;      
+let posY = 100;      
+let scale = 2.0;     
+let angle = 0;       
+let currentMode = 1; 
+
+function clearCanvas() {
+    for (let i = 0; i < data.length; i += 4) {
+        data[i] = 0;     
+        data[i+1] = 0;   
+        data[i+2] = 0;   
+        data[i+3] = 255; 
+    }
+}
+
+function drawSpriteTransformed(sprite, r, g, b) {
+    const sh = sprite.length;
+    const sw = sprite[0].length;
+    const cx = sw / 2;
+    const cy = sh / 2;
+    const rad = angle * Math.PI / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+
+    for (let j = 0; j < sh; j++) {
+        for (let i = 0; i < sw; i++) {
+            if (sprite[j][i] === 1) {
+                let xOrig = i - cx;
+                let yOrig = j - cy;
+                let xScaled = xOrig * scale;
+                let yScaled = yOrig * scale;
+                let xRot = xScaled * cos - yScaled * sin;
+                let yRot = xScaled * sin + yScaled * cos;
+                let finalX = Math.round(xRot + posX);
+                let finalY = Math.round(yRot + posY);
+
+                let size = Math.ceil(scale);
+                for (let sy = 0; sy < size; sy++) {
+                    for (let sx = 0; sx < size; sx++) {
+                        putPixel(finalX + sx, finalY + sy, r, g, b);
+                    }
+                }
+            }
+        }
+    }
+}
+
+function update() {
+    clearCanvas();
+    drawSpriteTransformed(spaceInvaderSprite, 0, 255, 128);
+    ctx.putImageData(imageData, 0, 0);
+}
+
+function updateInstructionDOM() {
+    const modeText = document.getElementById('current-mode-text');
+    const insList = document.getElementById('dynamic-instruction');
+    
+    if (currentMode === 1) {
+        modeText.innerText = "Translate Mode";
+        modeText.style.backgroundColor = "#007bff";
+        insList.innerHTML = "<li>ลูกศร ซ้าย/ขวา/ขึ้น/ลง : เลื่อนตำแหน่ง Sprite</li>";
+    } else if (currentMode === 2) {
+        modeText.innerText = "Rotate Mode";
+        modeText.style.backgroundColor = "#28a745";
+        insList.innerHTML = "<li>ลูกศร ซ้าย : หมุนทวนเข็มองศา (-)</li><li>ลูกศร ขวา : หมุนตามเข็มองศา (+)</li>";
+    } else if (currentMode === 3) {
+        modeText.innerText = "Scale Mode";
+        modeText.style.backgroundColor = "#dc3545";
+        insList.innerHTML = "<li>ลูกศร ขึ้น : ขยายขนาดใหญ่ขึ้น (+)</li><li>ลูกศร ลง : ย่อขนาดเล็กลง (-)</li>";
+    }
+}
+
+window.addEventListener('keydown', function (event) {
+    if (event.key === '1') { currentMode = 1; updateInstructionDOM(); }
+    if (event.key === '2') { currentMode = 2; updateInstructionDOM(); }
+    if (event.key === '3') { currentMode = 3; updateInstructionDOM(); }
+
+    if (currentMode === 1) {
+        if (event.key === 'ArrowUp') posY -= 2;
+        if (event.key === 'ArrowDown') posY += 2;
+        if (event.key === 'ArrowLeft') posX -= 2;
+        if (event.key === 'ArrowRight') posX += 2;
+    } 
+    else if (currentMode === 2) {
+        if (event.key === 'ArrowLeft') angle -= 5;
+        if (event.key === 'ArrowRight') angle += 5;
+    } 
+    else if (currentMode === 3) {
+        if (event.key === 'ArrowUp') scale += 0.2;
+        if (event.key === 'ArrowDown') {
+            if (scale > 0.4) scale -= 0.2;
+        }
+    }
+
+    update();
+});
+
+update();
+</script>
+
+</body>
+</html>
