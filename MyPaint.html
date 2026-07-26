@@ -1,0 +1,486 @@
+<html>
+<head>
+<title>My Paint</title>
+<style>
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: #202020; 
+    font-family: sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* แถบเครื่องมือด้านบน */
+  .top-toolbar {
+    background: #2b2b2b;
+    border-bottom: 1px solid #3a3a3a;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    color: #fff;
+    position: relative;
+    z-index: 10;
+  }
+
+  .tool-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-right: 1px solid #444;
+    padding-right: 15px;
+  }
+
+  .tool-group:last-child {
+    border-right: none;
+  }
+
+  .group-label {
+    font-size: 11px;
+    color: #888;
+    margin-right: 5px;
+  }
+
+  .tool-btn {
+    width: 38px;
+    height: 38px;
+    font-size: 18px;
+    border: 1px solid #444;
+    border-radius: 6px;
+    background: #333;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .tool-btn:hover {
+    background: #444;
+    border-color: #555;
+  }
+
+  .tool-btn.active {
+    background: #0078d4;
+    border-color: #005a9e;
+  }
+
+  .color-palette {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .color-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    box-shadow: 0 0 2px rgba(0,0,0,0.5);
+    transition: transform 0.1s;
+  }
+
+  .color-dot:hover {
+    transform: scale(1.1);
+  }
+
+  .color-dot.active {
+    border-color: #fff;
+    box-shadow: 0 0 4px #0078d4;
+  }
+
+  .stroke-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+  }
+
+  .stroke-input {
+    width: 60px; /* ขยายความกว้างเล็กน้อยรองรับเลขหลักร้อยหลักพัน */
+    padding: 4px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background: #333;
+    color: #fff;
+    text-align: center;
+  }
+
+  .btn-close {
+    position: absolute;
+    top: 55%;
+    right: 20px;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+    border: 1px solid #552222;
+    border-radius: 50%;
+    background: #442222;
+    color: #ffaaaa;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+  
+  .btn-close:hover {
+    background: #662222;
+    color: #fff;
+  }
+
+  /* พื้นที่แสดงแคนวาส */
+  .canvas-workspace {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 30px;
+    overflow: auto;
+    position: relative;
+  }
+
+  #canvas {
+    background: #ffffff;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    image-rendering: pixelated;
+    cursor: crosshair;
+  }
+
+  /* ไอคอนติดตามเมาส์สำหรับดินสอและยางลบ */
+  #paint-cursor {
+    position: absolute;
+    pointer-events: none;
+    font-size: 20px;
+    transform: translate(2px, -22px);
+    display: none;
+    z-index: 999;
+  }
+</style>
+</head>
+<body>
+
+<div class="top-toolbar">
+  <div class="tool-group">
+    <span class="group-label">Tools:</span>
+    <button id="btn-pencil" class="tool-btn active" onclick="changeTool('pencil')" title="ดินสอ">✏️</button>
+    <button id="btn-line" class="tool-btn" onclick="changeTool('line')" title="เส้นตรง">│</button>
+    <button id="btn-rect" class="tool-btn" onclick="changeTool('rect')" title="สี่เหลี่ยม">□</button>
+    <button id="btn-circle" class="tool-btn" onclick="changeTool('circle')" title="วงกลม">◯</button>
+    <button id="btn-eraser" class="tool-btn" onclick="changeTool('eraser')" title="ยางลบ">🧽</button>
+  </div>
+
+  <div class="tool-group">
+    <div class="stroke-control">
+      <span class="group-label">Size:</span>
+      <!-- ปลดล็อก max="10" ออก เพื่อให้กรอกเลขเท่าไหร่ก็ได้แบบอินฟินิตี้ -->
+      <input type="number" id="strokeSize" class="stroke-input" value="1" min="1" onchange="thickness = parseInt(this.value) || 1">
+    </div>
+  </div>
+
+  <div class="tool-group">
+    <span class="group-label">Colors:</span>
+    <div class="color-palette">
+      <div class="color-dot active" style="background: #ff0000;" onclick="selectPresetColor('#ff0000', this)"></div>
+      <div class="color-dot" style="background: #00ff00;" onclick="selectPresetColor('#00ff00', this)"></div>
+      <div class="color-dot" style="background: #0000ff;" onclick="selectPresetColor('#0000ff', this)"></div>
+      <div class="color-dot" style="background: #ffff00;" onclick="selectPresetColor('#ffff00', this)"></div>
+      <div class="color-dot" style="background: #ff00ff;" onclick="selectPresetColor('#ff00ff', this)"></div>
+      <div class="color-dot" style="background: #00ffff;" onclick="selectPresetColor('#00ffff', this)"></div>
+      <div class="color-dot" style="background: #000000;" onclick="selectPresetColor('#000000', this)"></div>
+      <div class="color-dot" style="background: #8b4513;" onclick="selectPresetColor('#8b4513', this)"></div>
+      
+      <input type="color" id="colorPicker" value="#ff0000" style="width:30px; height:26px; border:1px solid #444; background:none; cursor:pointer; padding:0;" oninput="updateColor(this.value); clearColorDotActive();">
+    </div>
+  </div>
+
+  <button id="btn-close" class="btn-close" onclick="closeWindow()" title="ปิดโปรแกรม">❌</button>
+</div>
+
+<div class="canvas-workspace" id="workspace">
+  <canvas id="canvas" width="800" height="500"></canvas>
+  <div id="paint-cursor">✏️</div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const workspace = document.getElementById('workspace');
+const paintCursor = document.getElementById('paint-cursor');
+const strokeInput = document.getElementById('strokeSize');
+
+const imageData = ctx.createImageData(canvas.width, canvas.height);
+const pixels = imageData.data; 
+
+let snapshotPixels = new Uint8ClampedArray(pixels.length);
+
+function putPixel(x, y, r, g, b, a = 255) {
+  if (x < 0 || x >= canvas.width || y < 0 || y >= canvas.height) return;
+  const idx = (y * canvas.width + x) * 4; 
+  pixels[idx] = r;
+  pixels[idx + 1] = g;
+  pixels[idx + 2] = b;
+  pixels[idx + 3] = a;
+}
+
+function putPixelWithThickness(x, y, r, g, b, a = 255) {
+  if (thickness === 1) {
+    putPixel(x, y, r, g, b, a);
+  } else {
+    const offset = Math.floor(thickness / 2);
+    for (let dy = -offset; dy <= offset; dy++) {
+      for (let dx = -offset; dx <= offset; dx++) {
+        putPixel(x + dx, y + dy, r, g, b, a);
+      }
+    }
+  }
+}
+
+function drawLine(x1, y1, x2, y2, r, g, b, a = 255) {
+  const dx = Math.abs(x2 - x1);
+  const dy = Math.abs(y2 - y1);
+
+  if(dx > dy) {
+    const m = (y2 - y1) / (x2 - x1);
+    const c = y1 - m * x1;
+    for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) {
+      const y = Math.round(m * x + c);
+      putPixelWithThickness(x, y, r, g, b, a);
+    }
+  } else {
+    const m = (x2 - x1) / (y2 - y1);
+    const c = x1 - m * y1;
+    for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
+      const x = Math.round(m * y + c);
+      putPixelWithThickness(x, y, r, g, b, a);
+    }
+  }
+}
+
+function drawRect(x1, y1, x2, y2, r, g, b, a = 255) {
+  drawLine(x1, y1, x2, y1, r, g, b, a); 
+  drawLine(x2, y1, x2, y2, r, g, b, a); 
+  drawLine(x2, y2, x1, y2, r, g, b, a); 
+  drawLine(x1, y2, x1, y1, r, g, b, a); 
+}
+
+function drawRectFilled(x1, y1, x2, y2, r, g, b, a = 255) {
+  for (let y = y1; y <= y2; y++) {
+    for (let x = x1; x <= x2; x++) {
+      putPixel(x, y, r, g, b, a);
+    }
+  }
+}
+
+function drawCircleOutline(cx, cy, radius, r, g, b, a = 255) {
+  let x = radius;
+  let y = 0;
+  let err = 1 - x;
+
+  while (x >= y) {
+    putPixelWithThickness(cx + x, cy + y, r, g, b, a);
+    putPixelWithThickness(cx + y, cy + x, r, g, b, a);
+    putPixelWithThickness(cx - y, cy + x, r, g, b, a);
+    putPixelWithThickness(cx - x, cy + y, r, g, b, a);
+    putPixelWithThickness(cx - x, cy - y, r, g, b, a);
+    putPixelWithThickness(cx - y, cy - x, r, g, b, a);
+    putPixelWithThickness(cx - y, cy - x, r, g, b, a);
+    putPixelWithThickness(cx + y, cy - x, r, g, b, a);
+    putPixelWithThickness(cx + x, cy - y, r, g, b, a);
+
+    y++;
+    if (err < 0) {
+      err += 2 * y + 1;
+    } else {
+      x--;
+      err += 2 * (y - x) + 1;
+    }
+  }
+}
+
+function toScaledMousePos(posX, posY) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return {
+    x: Math.floor((posX - rect.left) * scaleX),
+    y: Math.floor((posY - rect.top) * scaleY)
+  };
+}
+
+function drawShape(tool, x1, y1, x2, y2) {
+  if (tool === 'line') {
+    drawLine(x1, y1, x2, y2, r, g, b);
+  } 
+  else if (tool === 'rect') {
+    drawRect(x1, y1, x2, y2, r, g, b);
+  } 
+  else if (tool === 'circle') {
+    const radius = Math.round(Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)));
+    if (radius > 0) {
+      drawCircleOutline(x1, y1, radius, r, g, b);
+    }
+  }
+}
+
+function changeTool(toolName) {
+  currentTool = toolName;
+  document.querySelectorAll('.tool-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  document.getElementById(`btn-${toolName}`).classList.add('active');
+  
+  thickness = 1;
+  strokeInput.value = 1;
+
+  updateCursorIcon();
+}
+
+function updateColor(hexValues) {
+  r = parseInt(hexValues.substr(1, 2), 16);
+  g = parseInt(hexValues.substr(3, 2), 16);
+  b = parseInt(hexValues.substr(5, 2), 16);
+}
+
+function selectPresetColor(hexValue, element) {
+  updateColor(hexValue);
+  document.getElementById('colorPicker').value = hexValue;
+  clearColorDotActive();
+  element.classList.add('active');
+}
+
+function clearColorDotActive() {
+  document.querySelectorAll('.color-dot').forEach(dot => dot.classList.remove('active'));
+}
+
+function closeWindow() {
+  window.close();
+}
+
+let isDragging = false; 
+let previousX = 0;
+let previousY = 0;
+let r = 255, g = 0, b = 0, a = 255; 
+let currentTool = 'pencil'; 
+let thickness = 1;          
+let startX = 0, startY = 0; 
+
+function updateCursorIcon() {
+  if (currentTool === 'pencil') {
+    paintCursor.innerText = '✏️';
+    paintCursor.style.display = 'block';
+    canvas.style.cursor = 'none'; 
+  } else if (currentTool === 'eraser') {
+    paintCursor.innerText = '🧽';
+    paintCursor.style.display = 'block';
+    canvas.style.cursor = 'none'; 
+  } else {
+    paintCursor.style.display = 'none';
+    canvas.style.cursor = 'crosshair'; 
+  }
+}
+
+workspace.addEventListener('mousemove', (event) => {
+  if (currentTool === 'pencil' || currentTool === 'eraser') {
+    const rect = workspace.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    paintCursor.style.left = x + 'px';
+    paintCursor.style.top = y + 'px';
+  }
+});
+
+canvas.addEventListener('mouseenter', updateCursorIcon);
+canvas.addEventListener('mouseleave', () => {
+  paintCursor.style.display = 'none';
+});
+
+canvas.addEventListener('mousedown', (event) => {
+  isDragging = true;
+  const { x, y } = toScaledMousePos(event.clientX, event.clientY);
+  startX = x;
+  startY = y;
+  previousX = x;
+  previousY = y;
+  
+  snapshotPixels.set(pixels);
+
+  if (currentTool === 'pencil') {
+    putPixelWithThickness(x, y, r, g, b);
+  } else if (currentTool === 'eraser') {
+    putPixelWithThickness(x, y, 255, 255, 255); 
+  }
+  ctx.putImageData(imageData, 0, 0);
+});
+
+canvas.addEventListener('mousemove', (event) => {
+  const { x, y } = toScaledMousePos(event.clientX, event.clientY);
+
+  if(isDragging) {
+    if (currentTool === 'pencil') {
+      drawLine(previousX, previousY, x, y, r, g, b);
+    } 
+    else if (currentTool === 'eraser') {
+      drawLine(previousX, previousY, x, y, 255, 255, 255); 
+    }
+    else if (currentTool === 'line' || currentTool === 'rect' || currentTool === 'circle') {
+      pixels.set(snapshotPixels); 
+      drawShape(currentTool, startX, startY, x, y); 
+    }
+    ctx.putImageData(imageData, 0, 0);
+  }
+
+  previousX = x;
+  previousY = y;
+});
+
+canvas.addEventListener('mouseup', (event) => {
+  if (!isDragging) return;
+  isDragging = false;
+  
+  const { x, y } = toScaledMousePos(event.clientX, event.clientY);
+  
+  if (currentTool === 'line' || currentTool === 'rect' || currentTool === 'circle') {
+    pixels.set(snapshotPixels); 
+    drawShape(currentTool, startX, startY, x, y);
+  }
+  
+  ctx.putImageData(imageData, 0, 0);
+});
+
+window.addEventListener('keydown', function (event) {
+  const dots = document.querySelectorAll('.color-dot');
+  if(event.key === '1') { selectPresetColor('#ff0000', dots[0]); }
+  else if(event.key === '2') { selectPresetColor('#00ff00', dots[1]); }
+  else if(event.key === '3') { selectPresetColor('#0000ff', dots[2]); }
+
+  // ปลดล็อกขีดจำกัดสูงสุด เพิ่มขนาดได้เรื่อยๆ แบบอินฟินิตี้
+  if (event.key === '+' || event.key === 'Add') {
+    thickness += 1;
+    strokeInput.value = thickness;
+  }
+  // ลดขนาดยังจำกัดขั้นต่ำไว้ที่ 1 เพื่อไม่ให้ค่าติดลบหรือเป็นศูนย์
+  if (event.key === '-' || event.key === 'Subtract') {
+    if (thickness > 1) {
+      thickness -= 1;
+      strokeInput.value = thickness;
+    }
+  }
+});
+
+updateCursorIcon();
+drawRectFilled(0, 0, canvas.width - 1, canvas.height - 1, 255, 255, 255); 
+ctx.putImageData(imageData, 0, 0);
+</script>
+</body>
+</html>
