@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Main Menu</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background-color: #ff7cde; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        .cv-page-full { width: 100%; max-width: 650px; background-color: #ffffff; padding: 40px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-radius: 12px; display: flex; flex-direction: column; }
+        .cv-header { text-align: center; margin-bottom: 25px; }
+        .cv-header h1 { margin: 0 0 5px 0; color: #1a1a1a; font-size: 32px; }
+        .cv-header h2 { margin: 0; color: #f200ff; font-size: 22px; font-weight: 500; }
+        .menu-section { display: flex; flex-direction: column; gap: 15px; margin-top: 10px; }
+        .btn-primary-action { display: block; width: 100%; padding: 14px; background-color: #ff55e0; color: white; text-align: center; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; text-decoration: none; transition: background-color 0.2s; }
+        .btn-primary-action:hover { background-color: #d63bb8; }
+        .btn-secondary-action { display: block; width: 100%; padding: 10px; background-color: #6c757d; color: white; text-align: center; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-decoration: none; margin-top: 20px; transition: background-color 0.2s; }
+        .btn-secondary-action:hover { background-color: #5a6268; }
+    </style>
+</head>
+<body>
+
+    <div class="cv-page-full">
+        <div class="cv-header">
+            <h1>Main Menu</h1>
+        </div>
+
+        <div class="menu-section">
+            <a href="MyPaint.html" class="btn-primary-action">🎨 Paint Program</a>
+            <a href="gpu_interaction.html" class="btn-primary-action">🕹️ Interactive Transform</a>
+        </div>
+
+        <a href="index.html" class="btn-secondary-action">⬅ ย้อนกลับหน้า CV</a>
+    </div>
+
+</body>
+</html>
