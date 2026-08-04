@@ -252,7 +252,6 @@
             }
         });
 
-        // --- ฟังก์ชันช่วยเหลือเกี่ยวกับ UI ---
         function changeTool(toolName) {
           currentTool = toolName;
           document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
@@ -304,8 +303,6 @@
           paintCtx.putImageData(tempImageData, 0, 0);
           requestAnimationFrame(animate);
         }
-        
-        // เริ่มต้นรันระบบเรนเดอร์ลูป
         animate();
     </script>
 </body>
