@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>3D Scene with GLTF Model</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Three.js Core & Loaders -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/EXRLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
+    <script>
+        // 1. Setup Renderer
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.outputEncoding = THREE.sRGBEncoding; // ตั้งค่าสีให้ถูกต้องสมจริง
+        document.body.appendChild(renderer.domElement);
+
+        // 2. Setup Scene & Camera
+        const scene = new THREE.Scene();
+
+        const camera = new THREE.PerspectiveCamera(
+            75,
+            window.innerWidth / window.innerHeight,
+            0.1,
+            1000
+        );
+        camera.position.set(0, 2, 5);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+
+        // 3. Setup Lights (ปรับแสงให้เป็นโทนแฟนตาซีอบอุ่น นุ่มนวล)
+        const ambientLight = new THREE.AmbientLight(0xffe6f2, 0.9); // แสง Ambient โทนชมพูอ่อนๆ
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffd19e, 1.6); // แสงแดดสีทองอบอุ่น
+        directionalLight.position.set(5, 12, 7);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 1024;
+        directionalLight.shadow.mapSize.height = 1024;
+        scene.add(directionalLight);
+
+        // ปรับ Renderer เพิ่ม Tone Mapping ให้สีสันออกนุ่มละมุนแบบฟีลการ์ตูน
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.1;
+
+        // 4. Load EXR Skybox (เปลี่ยนเป็นท้องฟ้าแฟนตาซี)
+        // เปลี่ยนลิงก์เป็นท้องฟ้าสีสวยฟรุ้งฟริ้ง
+        const exrSkyboxUrl = 'https://dl.polyhaven.org/file/ph-assets/HDRIs/exr/1k/kloppenheim_02_1k.exr'; 
+        const pmremGenerator = new THREE.PMREMGenerator(renderer);
+        pmremGenerator.compileEquirectangularShader();
+
+    new THREE.EXRLoader()
+    .setDataType(THREE.UnsignedByteType)
+    .load(exrSkyboxUrl, (texture) => {
+        const skybox = pmremGenerator.fromEquirectangular(texture).texture;
+        scene.background = skybox;
+        scene.environment = skybox; // แสงสะท้อนบนตัวจิ้งจอกจะปรับตามสีท้องฟ้าแฟนตาซีด้วย
+
+        texture.dispose();
+        pmremGenerator.dispose();
+    }, undefined, (error) => {
+        console.error('Unable to load EXR skybox:', error);
+    });
+        // Ground Plane แบบโปร่งแสง (รับเฉพาะเงาตกกระทบ)
+        const planeGeometry = new THREE.PlaneGeometry(10, 10);
+        const planeMaterial = new THREE.ShadowMaterial({ opacity: 0.4 }); // แสดงเฉพาะเงาความเข้ม 40%
+        const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+        plane.rotation.x = -Math.PI / 2;
+        plane.position.y = 0;
+        plane.receiveShadow = true;
+        scene.add(plane);
+        // ==========================================
+        // 5. ดึงไฟล์โมเดล .gltf / .glb เข้ามาใส่ในฉาก
+        // ==========================================
+        const gltfLoader = new THREE.GLTFLoader();
+        
+        const modelUrl = 'https://parinda-sena.github.io/MyPage/Fox.glb';
+
+        gltfLoader.load(
+            modelUrl,
+            (gltf) => {
+                const model = gltf.scene;
+
+                // วนลูปผ่านทุกชิ้นส่วนในโมเดลเพื่อเปิดใช้งาน Shadow (แสงเงา)
+                model.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                    }
+                });
+
+                // ปรับขนาด (Scale) และ ตำแหน่ง (Position) ของโมเดลตามความเหมาะสม
+                model.scale.set(1, 1, 1); 
+                model.position.set(0, 0, 0);
+
+                scene.add(model);
+                console.log('โหลดโมเดลสำเร็จแล้ว!');
+            },
+            (xhr) => {
+                // ตัวติดตามความคืบหน้าการโหลด (Progress)
+                console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+            },
+            (error) => {
+                // แจ้งเตือนเมื่อโหลดไม่สำเร็จ
+                console.error('เกิดข้อผิดพลาดในการโหลดโมเดล:', error);
+            }
+        );
+
+        // 6. Animation Loop & Window Resize Handling
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+
+</html>
