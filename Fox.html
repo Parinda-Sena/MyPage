@@ -18,13 +18,18 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/EXRLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 
+    <!-- dat.GUI Library สำหรับสร้างกล่องปรับแสงด้วยเมาส์ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js"></script>
+
     <script>
         // 1. Setup Renderer
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        renderer.outputEncoding = THREE.sRGBEncoding; // ตั้งค่าสีให้ถูกต้องสมจริง
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.1;
         document.body.appendChild(renderer.domElement);
 
         // 2. Setup Scene & Camera
@@ -41,60 +46,79 @@
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
 
-        // 3. Setup Lights (ปรับแสงให้เป็นโทนแฟนตาซีอบอุ่น นุ่มนวล)
-        const ambientLight = new THREE.AmbientLight(0xffe6f2, 0.9); // แสง Ambient โทนชมพูอ่อนๆ
+        // 3. Setup Lights
+        const ambientLight = new THREE.AmbientLight(0xffe6f2, 0.9);
         scene.add(ambientLight);
 
-        const directionalLight = new THREE.DirectionalLight(0xffd19e, 1.6); // แสงแดดสีทองอบอุ่น
+        const directionalLight = new THREE.DirectionalLight(0xffd19e, 1.6);
         directionalLight.position.set(5, 12, 7);
         directionalLight.castShadow = true;
         directionalLight.shadow.mapSize.width = 1024;
         directionalLight.shadow.mapSize.height = 1024;
         scene.add(directionalLight);
 
-        // ปรับ Renderer เพิ่ม Tone Mapping ให้สีสันออกนุ่มละมุนแบบฟีลการ์ตูน
-        renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.1;
+        // ==========================================
+        // 🛠️ GUI Controls ปรับแสงด้วยเมาส์ (มุมขวาบน)
+        // ==========================================
+        const gui = new dat.GUI();
 
-        // 4. Load EXR Skybox (เปลี่ยนเป็นท้องฟ้าแฟนตาซี)
-        // เปลี่ยนลิงก์เป็นท้องฟ้าสีสวยฟรุ้งฟริ้ง
+        // เมนูควบคุม Directional Light (แสงหลัก + เงา)
+        const lightFolder = gui.addFolder('Directional Light');
+        lightFolder.add(directionalLight.position, 'x', -20, 20, 0.1).name('Pos X');
+        lightFolder.add(directionalLight.position, 'y', 0, 30, 0.1).name('Pos Y');
+        lightFolder.add(directionalLight.position, 'z', -20, 20, 0.1).name('Pos Z');
+        lightFolder.add(directionalLight, 'intensity', 0, 5, 0.1).name('Intensity');
+
+        const lightColor = { color: '#ffd19e' };
+        lightFolder.addColor(lightColor, 'color').name('Color').onChange((value) => {
+            directionalLight.color.set(value);
+        });
+        lightFolder.open();
+
+        // เมนูควบคุม Ambient Light (แสงโดยรอบ)
+        const ambientFolder = gui.addFolder('Ambient Light');
+        ambientFolder.add(ambientLight, 'intensity', 0, 2, 0.1).name('Intensity');
+
+        // 4. Load EXR Skybox
         const exrSkyboxUrl = 'https://dl.polyhaven.org/file/ph-assets/HDRIs/exr/1k/kloppenheim_02_1k.exr'; 
         const pmremGenerator = new THREE.PMREMGenerator(renderer);
         pmremGenerator.compileEquirectangularShader();
 
-    new THREE.EXRLoader()
-    .setDataType(THREE.UnsignedByteType)
-    .load(exrSkyboxUrl, (texture) => {
-        const skybox = pmremGenerator.fromEquirectangular(texture).texture;
-        scene.background = skybox;
-        scene.environment = skybox; // แสงสะท้อนบนตัวจิ้งจอกจะปรับตามสีท้องฟ้าแฟนตาซีด้วย
+        new THREE.EXRLoader()
+            .setDataType(THREE.UnsignedByteType)
+            .load(exrSkyboxUrl, (texture) => {
+                const skybox = pmremGenerator.fromEquirectangular(texture).texture;
+                scene.background = skybox;
+                scene.environment = skybox;
 
-        texture.dispose();
-        pmremGenerator.dispose();
-    }, undefined, (error) => {
-        console.error('Unable to load EXR skybox:', error);
-    });
+                texture.dispose();
+                pmremGenerator.dispose();
+            }, undefined, (error) => {
+                console.error('Unable to load EXR skybox:', error);
+            });
+
         // Ground Plane แบบโปร่งแสง (รับเฉพาะเงาตกกระทบ)
         const planeGeometry = new THREE.PlaneGeometry(10, 10);
-        const planeMaterial = new THREE.ShadowMaterial({ opacity: 0.4 }); // แสดงเฉพาะเงาความเข้ม 40%
+        const planeMaterial = new THREE.ShadowMaterial({ opacity: 0.4 });
         const plane = new THREE.Mesh(planeGeometry, planeMaterial);
         plane.rotation.x = -Math.PI / 2;
         plane.position.y = 0;
         plane.receiveShadow = true;
         scene.add(plane);
+
         // ==========================================
-        // 5. ดึงไฟล์โมเดล .gltf / .glb เข้ามาใส่ในฉาก
+        // 5. ดึงไฟล์โมเดล Fox.glb
         // ==========================================
         const gltfLoader = new THREE.GLTFLoader();
         
-        const modelUrl = 'https://parinda-sena.github.io/MyPage/Fox.glb';
+        // แนะนำใช้ Relative Path หากไฟล์ Fox.glb อยู่โฟลเดอร์เดียวกับ HTML
+        const modelUrl = './Fox.glb'; 
 
         gltfLoader.load(
             modelUrl,
             (gltf) => {
                 const model = gltf.scene;
 
-                // วนลูปผ่านทุกชิ้นส่วนในโมเดลเพื่อเปิดใช้งาน Shadow (แสงเงา)
                 model.traverse((child) => {
                     if (child.isMesh) {
                         child.castShadow = true;
@@ -102,19 +126,30 @@
                     }
                 });
 
-                // ปรับขนาด (Scale) และ ตำแหน่ง (Position) ของโมเดลตามความเหมาะสม
-                model.scale.set(1, 1, 1); 
-                model.position.set(0, 0, 0);
+                // จัดตำแหน่งและสเกลโมเดลให้อยู่ตรงกลางและพอดีฉากอัตโนมัติ
+                const box = new THREE.Box3().setFromObject(model);
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+
+                model.position.x += (model.position.x - center.x);
+                model.position.y += (model.position.y - box.min.y);
+                model.position.z += (model.position.z - center.z);
+
+                const maxDim = Math.max(size.x, size.y, size.z);
+                if (maxDim > 0) {
+                    const scale = 2 / maxDim;
+                    model.scale.set(scale, scale, scale);
+                }
 
                 scene.add(model);
                 console.log('โหลดโมเดลสำเร็จแล้ว!');
             },
             (xhr) => {
-                // ตัวติดตามความคืบหน้าการโหลด (Progress)
-                console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+                if (xhr.total > 0) {
+                    console.log((xhr.loaded / xhr.total * 100).toFixed(2) + '% loaded');
+                }
             },
             (error) => {
-                // แจ้งเตือนเมื่อโหลดไม่สำเร็จ
                 console.error('เกิดข้อผิดพลาดในการโหลดโมเดล:', error);
             }
         );
