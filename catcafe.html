@@ -37,9 +37,9 @@
         controls.enableDamping = true;
         controls.target.set(0, 2, 0);
 
-        // โหลดไฟล์ _catcafe.glb
+        // โหลดไฟล์ catcafe.glb
         const loader = new THREE.GLTFLoader();
-        loader.load('_catcafe.glb', (gltf) => {
+        loader.load('catcafe.glb', (gltf) => {
             console.log("Loaded successfully!");
             const model = gltf.scene;
             scene.add(model);
