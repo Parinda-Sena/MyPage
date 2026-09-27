@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Interactive Cat Cafe Portfolio</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #f4ece1; font-family: sans-serif; }
+        body { margin: 0; overflow: hidden; background-color: #f4ece1; font-family: 'sans-serif'; }
         canvas { display: block; }
         
+        /* เมนูปุ่มควบคุมมุมกล้อง */
         .ui-container {
             position: absolute;
             bottom: 20px;
@@ -50,17 +51,18 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
     </style>
+    <!-- Library Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <!-- GSAP library สำหรับสร้าง Motion การซูมกล้องให้นุ่มนวล -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 </head>
 <body>
-    <div class="hint-text">💡 คลิกที่ประตูเพื่อเปิด/ปิดร้าน หรือกดปุ่มด้านล่างเพื่อสลับมุมมอง</div>
+    <div class="hint-text">💡 คลิกที่ปุ่มด้านล่าง หรือคลิกที่กรอบรูป/ข้อความบนฐานเพื่อซูมดูรายละเอียด</div>
 
     <div class="ui-container">
         <button class="ui-btn" onclick="focusMainView()">🏠 มุมมองหลัก</button>
-        <button class="ui-btn" onclick="toggleDoor()">🚪 เปิด/ปิดประตู</button>
         <button class="ui-btn" onclick="focusPhoto()">🖼️ ซูมรูปโปรไฟล์</button>
         <button class="ui-btn" onclick="focusCV()">📜 ซูมดูประวัติ (CV)</button>
     </div>
@@ -70,8 +72,11 @@
         scene.background = new THREE.Color(0xf4ece1);
 
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        
+        // ตำแหน่งกล้องเริ่มต้น (มุมมองหลัก)
         const defaultCamPos = { x: 0, y: 3.5, z: 9 };
         const defaultTarget = { x: 0, y: 1.2, z: 0 };
+        
         camera.position.set(defaultCamPos.x, defaultCamPos.y, defaultCamPos.z);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -96,11 +101,6 @@
         controls.target.set(defaultTarget.x, defaultTarget.y, defaultTarget.z);
 
         let cafeModel = null;
-        let mixer = null;
-        let doorAction = null;
-        let isDoorOpen = false;
-
-        const clock = new THREE.Clock();
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
@@ -108,42 +108,11 @@
         loader.load('catcafe.glb', (gltf) => {
             cafeModel = gltf.scene;
             scene.add(cafeModel);
-
-            // ตั้งค่า Animation Mixer เมื่อโหลดไฟล์สำเร็จ
-            if (gltf.animations && gltf.animations.length > 0) {
-                mixer = new THREE.AnimationMixer(cafeModel);
-                
-                // ดึง Animation แรก หรือค้นหาจากชื่อ Animation ที่ตั้งใน Blender
-                const doorClip = gltf.animations.find(clip => clip.name.toLowerCase().includes('door')) || gltf.animations[0];
-                
-                if (doorClip) {
-                    doorAction = mixer.clipAction(doorClip);
-                    doorAction.setLoop(THREE.LoopOnce); // เล่นรอบเดียวแล้วหยุด
-                    doorAction.clampWhenFinished = true; // ค้างไว้ตำแหน่งสุดท้ายเมื่อเล่นจบ
-                }
-            }
         }, undefined, (error) => {
             console.error('Error loading model:', error);
         });
 
-        // ฟังก์ชันสั่งสลับเปิด/ปิดประตู
-        function toggleDoor() {
-            if (!doorAction) return;
-
-            doorAction.paused = false;
-            if (!isDoorOpen) {
-                // เล่น Animation ไปข้างหน้า (เปิดประตู)
-                doorAction.timeScale = 1;
-                doorAction.play();
-                isDoorOpen = true;
-            } else {
-                // เล่น Animation ถอยหลัง (ปิดประตู)
-                doorAction.timeScale = -1;
-                doorAction.play();
-                isDoorOpen = false;
-            }
-        }
-
+        // ฟังก์ชันย้ายกล้องไปตามตำแหน่งเป้าหมายด้วย GSAP
         function moveCamera(targetCamPos, targetLookAt) {
             gsap.to(camera.position, {
                 x: targetCamPos.x,
@@ -163,20 +132,26 @@
             });
         }
 
+        // ตำแหน่งมุมมองโฟกัสแต่ละส่วน
         function focusMainView() {
             moveCamera(defaultCamPos, defaultTarget);
         }
 
         function focusPhoto() {
+            // โฟกัสไปที่กรอบรูปบนผนัง/ป้าย
             moveCamera({ x: -1.2, y: 2.2, z: 3.5 }, { x: -1.2, y: 2.0, z: 0 });
         }
 
         function focusCV() {
-            moveCamera({ x: -0.2, y: 3.2, z: 2.2 }, { x: -0.2, y: 0.1, z: 1.2 });
-        }
+    moveCamera(
+        { x: -0.2, y: 3.5, z: 4.5 },
+        { x: -0.2, y: 0.2, z: 1.0 }  
+    );
+}
 
-        // คลิกตรวจจับชิ้นส่วนประตูเพื่อเปิด/ปิด
+        // ระบบตรวจจับการคลิกบนชิ้นส่วน 3D (Raycaster)
         window.addEventListener('click', (event) => {
+            // คำนวณตำแหน่งเมาส์ในระบบพิกัด Screen to World (-1 ถึง +1)
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
@@ -188,11 +163,10 @@
                     const clickedObj = intersects[0].object;
                     const name = clickedObj.name.toLowerCase();
 
-                    if (name.includes('door') || name.includes('gate')) {
-                        toggleDoor();
-                    } else if (name.includes('frame') || name.includes('photo') || name.includes('selfie')) {
+                    
+                    if (name.includes('frame') || name.includes('photo') || name.includes('selfie')) {
                         focusPhoto();
-                    } else if (name.includes('cv') || name.includes('text')) {
+                    } else if (name.includes('cv') || name.includes('text') || name.includes('text_cv')) {
                         focusCV();
                     }
                 }
@@ -201,11 +175,6 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            
-            // อัปเดตเฟรม Animation mixer ในแต่ละเฟรม
-            const delta = clock.getDelta();
-            if (mixer) mixer.update(delta);
-
             controls.update();
             renderer.render(scene, camera);
         }
