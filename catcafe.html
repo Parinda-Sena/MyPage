@@ -59,6 +59,7 @@
     <div class="hint-text">💡 คลิกที่ประตูเพื่อเปิด/ปิดร้าน หรือกดปุ่มด้านล่างเพื่อสลับมุมมอง</div>
 
     <div class="ui-container">
+        <button class="ui-btn" onclick="focusMainView()">🏠 มุมมองหลัก</button>
         <button class="ui-btn" onclick="toggleDoor()">🚪 เปิด/ปิดประตู</button>
         <button class="ui-btn" onclick="focusPhoto()">🖼️ ซูมรูปโปรไฟล์</button>
         <button class="ui-btn" onclick="focusCV()">📜 ซูมดูประวัติ (CV)</button>
@@ -69,8 +70,10 @@
         scene.background = new THREE.Color(0xf4ece1);
 
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const defaultCamPos = { x: 0, y: 3.5, z: 9 };
-        const defaultTarget = { x: 0, y: 1.2, z: 0 };
+        
+        // 1. ถอยตำแหน่งกล้องเริ่มต้น (มุมมองหลัก) ออกมาเพื่อเห็นโมเดลเต็มๆ ไม่ถูกตัดขอบ
+        const defaultCamPos = { x: 0, y: 7, z: 20 };
+        const defaultTarget = { x: 0, y: 2, z: 0 };
         camera.position.set(defaultCamPos.x, defaultCamPos.y, defaultCamPos.z);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -108,35 +111,30 @@
             cafeModel = gltf.scene;
             scene.add(cafeModel);
 
-            // ตั้งค่า Animation Mixer เมื่อโหลดไฟล์สำเร็จ
             if (gltf.animations && gltf.animations.length > 0) {
                 mixer = new THREE.AnimationMixer(cafeModel);
                 
-                // ดึง Animation แรก หรือค้นหาจากชื่อ Animation ที่ตั้งใน Blender
                 const doorClip = gltf.animations.find(clip => clip.name.toLowerCase().includes('door')) || gltf.animations[0];
                 
                 if (doorClip) {
                     doorAction = mixer.clipAction(doorClip);
-                    doorAction.setLoop(THREE.LoopOnce); // เล่นรอบเดียวแล้วหยุด
-                    doorAction.clampWhenFinished = true; // ค้างไว้ตำแหน่งสุดท้ายเมื่อเล่นจบ
+                    doorAction.setLoop(THREE.LoopOnce);
+                    doorAction.clampWhenFinished = true;
                 }
             }
         }, undefined, (error) => {
             console.error('Error loading model:', error);
         });
 
-        // ฟังก์ชันสั่งสลับเปิด/ปิดประตู
         function toggleDoor() {
             if (!doorAction) return;
 
             doorAction.paused = false;
             if (!isDoorOpen) {
-                // เล่น Animation ไปข้างหน้า (เปิดประตู)
                 doorAction.timeScale = 1;
                 doorAction.play();
                 isDoorOpen = true;
             } else {
-                // เล่น Animation ถอยหลัง (ปิดประตู)
                 doorAction.timeScale = -1;
                 doorAction.play();
                 isDoorOpen = false;
@@ -162,22 +160,28 @@
             });
         }
 
+        // 2. ปรับระยะการสลับมุมมองแต่ละปุ่ม
+        function focusMainView() {
+            // กลับมามุมมองหลักแบบกว้าง เห็นทั้งป้ายเมนู รูป ประวัติ และหัวแมว
+            moveCamera(defaultCamPos, defaultTarget);
+        }
 
         function focusCV() {
+            // ถอยกล้องมุมก้มมองป้าย CV บนพื้นฐานอย่างชัดเจน ไม่จมพื้น
+            moveCamera(
+                { x: 0.0, y: 7.0, z: 12.0 }, 
+                { x: 0.0, y: 0.5, z: 2.5 }
+            );
+        }
 
-    moveCamera(
-        { x: 0.0, y: 4.5, z: 8.0 }, 
-        { x: 0.0, y: 0.5, z: 1.5 }
-    );
-}
+        function focusPhoto() {
+            // ถอยกล้องมองแผ่นรูปโปรไฟล์ตรงหน้าต่างในระยะพอดี
+            moveCamera(
+                { x: -1.2, y: 2.5, z: 9.0 }, 
+                { x: -1.2, y: 2.2, z: 0.0 }
+            );
+        }
 
-function focusPhoto() {
-    moveCamera(
-        { x: -1.0, y: 3.5, z: 7.0 }, 
-        { x: -1.0, y: 2.0, z: 0.0 }
-    );
-}
-        // คลิกตรวจจับชิ้นส่วนประตูเพื่อเปิด/ปิด
         window.addEventListener('click', (event) => {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -204,7 +208,6 @@ function focusPhoto() {
         function animate() {
             requestAnimationFrame(animate);
             
-            // อัปเดตเฟรม Animation mixer ในแต่ละเฟรม
             const delta = clock.getDelta();
             if (mixer) mixer.update(delta);
 
