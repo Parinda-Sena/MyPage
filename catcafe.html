@@ -59,7 +59,6 @@
     <div class="hint-text">💡 คลิกที่ประตูเพื่อเปิด/ปิดร้าน หรือกดปุ่มด้านล่างเพื่อสลับมุมมอง</div>
 
     <div class="ui-container">
-        <button class="ui-btn" onclick="focusMainView()">🏠 มุมมองหลัก</button>
         <button class="ui-btn" onclick="toggleDoor()">🚪 เปิด/ปิดประตู</button>
         <button class="ui-btn" onclick="focusPhoto()">🖼️ ซูมรูปโปรไฟล์</button>
         <button class="ui-btn" onclick="focusCV()">📜 ซูมดูประวัติ (CV)</button>
@@ -163,9 +162,6 @@
             });
         }
 
-        function focusMainView() {
-            moveCamera(defaultCamPos, defaultTarget);
-        }
 
         function focusCV() {
 
