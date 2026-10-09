@@ -67,20 +67,20 @@
     <!-- Vertex Shader Definition -->
     <script id="vertexShader" type="x-shader/x-vertex">
         varying vec2 vUv;
-        varying vec3 vNormal;
-        varying vec3 vViewPosition;
+        varying vec3 vWorldNormal;
+        varying vec3 vWorldPosition;
 
         void main() {
             vUv = uv;
             
-            // คำนวณ Normal vector ให้อยู่ใน World/View space
-            vNormal = normalize(normalMatrix * normal);
+            // คำนวณ Normal vector ใน World Space
+            vWorldNormal = normalize(mat3(modelMatrix) * normal);
             
-            // คำนวณตำแหน่ง Vertex สำหรับ Lighting calculation
-            vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-            vViewPosition = -mvPosition.xyz;
+            // คำนวณ Vertex Position ใน World Space
+            vec4 worldPos = modelMatrix * vec4(position, 1.0);
+            vWorldPosition = worldPos.xyz;
 
-            gl_Position = projectionMatrix * mvPosition;
+            gl_Position = projectionMatrix * viewMatrix * worldPos;
         }
     </script>
 
@@ -92,23 +92,24 @@
         uniform vec3 baseColor;
 
         varying vec2 vUv;
-        varying vec3 vNormal;
-        varying vec3 vViewPosition;
+        varying vec3 vWorldNormal;
+        varying vec3 vWorldPosition;
 
         void main() {
-            // ดึงสีจาก Texture (ถ้ามี) หรือใช้ baseColor
-            vec4 texColor = hasTexture ? texture2D(mainTexture, vUv) : vec4(baseColor, 1.0);
-            
-            // Directional Light คำนวณง่ายๆ (Diffuse Lighting)
-            vec3 normal = normalize(vNormal);
-            vec3 lightDir = normalize(lightPosition);
-            
-            float diff = max(dot(normal, lightDir), 0.2); // กำหนด Ambient floor ไว้ที่ 0.2 เพื่อไม่ให้มืดสนิท
-            
-            // ปรับแต่งสีสุดท้ายโดยรวมแสง
-            vec3 finalColor = texColor.rgb * diff;
+            // ดึงสีจาก Texture หรือ Base Color
+            vec4 color = hasTexture ? texture2D(mainTexture, vUv) : vec4(baseColor, 1.0);
 
-            gl_FragColor = vec4(finalColor, texColor.a);
+            // คำนวณแสง Directional ใน World Space
+            vec3 normal = normalize(vWorldNormal);
+            vec3 lightDir = normalize(lightPosition - vWorldPosition);
+
+            // คำนวณแสง Ambient + Diffuse ให้สว่างนวลตา
+            float ambient = 0.6; 
+            float diffuse = max(dot(normal, lightDir), 0.0) * 0.4;
+            
+            float lightIntensity = ambient + diffuse;
+
+            gl_FragColor = vec4(color.rgb * lightIntensity, color.a);
         }
     </script>
 
@@ -142,26 +143,24 @@
         controls.enableDamping = true;
         controls.target.set(defaultTarget.x, defaultTarget.y, defaultTarget.z);
 
-        // ดึงโค้ด Shader จาก <script> tags
-        const vertShaderCode = document.getElementById('vertexShader').textContent;
-        const fragShaderCode = document.getElementById('fragmentShader').textContent;
-
-        // สร้าง Custom ShaderMaterial
+        // ฟังก์ชันแปลง Material เดิมของ GLTF มาใช้ Custom Shader
         function createCustomShaderMaterial(originalMaterial) {
-            const uniforms = {
-                mainTexture: { value: originalMaterial ? originalMaterial.map : null },
-                hasTexture: { value: (originalMaterial && originalMaterial.map) ? true : false },
-                lightPosition: { value: dirLight.position },
-                baseColor: { value: originalMaterial && originalMaterial.color ? originalMaterial.color : new THREE.Color(0xffffff) }
-            };
+            if (!originalMaterial) return new THREE.MeshBasicMaterial();
+
+            const map = originalMaterial.map || null;
+            const color = originalMaterial.color ? originalMaterial.color : new THREE.Color(0xffffff);
 
             return new THREE.ShaderMaterial({
-                vertexShader: vertShaderCode,
-                fragmentShader: fragShaderCode,
-                uniforms: uniforms,
-                transparent: originalMaterial ? originalMaterial.transparent : false,
-                morphTargets: true, // รองรับ Morph targets
-                skinning: true      // รองรับ Skeletal Animation ของ GLTF
+                vertexShader: document.getElementById('vertexShader').textContent,
+                fragmentShader: document.getElementById('fragmentShader').textContent,
+                uniforms: {
+                    mainTexture: { value: map },
+                    hasTexture: { value: map !== null },
+                    lightPosition: { value: dirLight.position },
+                    baseColor: { value: color }
+                },
+                transparent: originalMaterial.transparent || false,
+                side: THREE.DoubleSide
             });
         }
 
@@ -178,7 +177,7 @@
         loader.load('catcafe.glb', (gltf) => {
             cafeModel = gltf.scene;
 
-            // นำ Custom Shader Material ไปประยุกต์ใช้กับทุก Mesh ใน GLTF Model
+            // นำ Custom Shader ไปใช้กับ Mesh ทุกชิ้นในโมเดล
             cafeModel.traverse((child) => {
                 if (child.isMesh) {
                     child.material = createCustomShaderMaterial(child.material);
@@ -187,17 +186,16 @@
 
             scene.add(cafeModel);
 
-            // ตั้งค่า Animation Mixer เมื่อโหลดไฟล์สำเร็จ
+            // ตั้งค่า Animation Mixer
             if (gltf.animations && gltf.animations.length > 0) {
                 mixer = new THREE.AnimationMixer(cafeModel);
                 
-                // ดึง Animation แรก หรือค้นหาจากชื่อ Animation ที่ตั้งใน Blender
                 const doorClip = gltf.animations.find(clip => clip.name.toLowerCase().includes('door')) || gltf.animations[0];
                 
                 if (doorClip) {
                     doorAction = mixer.clipAction(doorClip);
-                    doorAction.setLoop(THREE.LoopOnce); // เล่นรอบเดียวแล้วหยุด
-                    doorAction.clampWhenFinished = true; // ค้างไว้ตำแหน่งสุดท้ายเมื่อเล่นจบ
+                    doorAction.setLoop(THREE.LoopOnce);
+                    doorAction.clampWhenFinished = true;
                 }
             }
         }, undefined, (error) => {
@@ -210,12 +208,10 @@
 
             doorAction.paused = false;
             if (!isDoorOpen) {
-                // เล่น Animation ไปข้างหน้า (เปิดประตู)
                 doorAction.timeScale = 1;
                 doorAction.play();
                 isDoorOpen = true;
             } else {
-                // เล่น Animation ถอยหลัง (ปิดประตู)
                 doorAction.timeScale = -1;
                 doorAction.play();
                 isDoorOpen = false;
@@ -255,7 +251,7 @@
             );
         }
 
-        // คลิกตรวจจับชิ้นส่วนประตูเพื่อเปิด/ปิด
+        // คลิกตรวจจับชิ้นส่วนประตู/รูปภาพ/CV
         window.addEventListener('click', (event) => {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -282,7 +278,6 @@
         function animate() {
             requestAnimationFrame(animate);
             
-            // อัปเดตเฟรม Animation mixer ในแต่ละเฟรม
             const delta = clock.getDelta();
             if (mixer) mixer.update(delta);
 
