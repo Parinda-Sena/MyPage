@@ -82,11 +82,9 @@
         varying vec3 vNormal;
 
         void main() {
-            // จังหวะแสงกะพริบเรืองแสง
             float pulse = 0.8 + 0.2 * sin(time * 3.0 + vUv.x * 4.0);
             float rim = pow(1.0 - max(0.0, dot(vNormal, vec3(0.0, 0.0, 1.0))), 1.5);
             
-            // สีชมพูพาสเทลสด (Rich Pastel Neon Pink)
             vec3 basePink = vec3(1.0, 0.35, 0.65) * pulse;
             vec3 glowRim = vec3(1.0, 0.6, 0.85) * rim * 1.2;
             
@@ -124,7 +122,6 @@
         controls.enableDamping = true;
         controls.target.set(defaultTarget.x, defaultTarget.y, defaultTarget.z);
 
-        // Material Shader สีชมพูพาสเทลสด
         const pinkShaderMaterial = new THREE.ShaderMaterial({
             vertexShader: document.getElementById('vertexShader').textContent,
             fragmentShader: document.getElementById('fragmentShader').textContent,
@@ -145,14 +142,12 @@
             cafeModel = gltf.scene;
             scene.add(cafeModel);
 
-            // ใส่ Shader เฉพาะชิ้นส่วน Awning โดยไม่ให้กระทบชิ้นส่วนอื่น
             cafeModel.traverse((child) => {
                 if (child.isMesh && child.name === 'Awning') {
                     child.material = pinkShaderMaterial;
                 }
             });
 
-            // ระบบ Animation ประตู (โค้ดดั้งเดิมของคุณ)
             if (gltf.animations && gltf.animations.length > 0) {
                 mixer = new THREE.AnimationMixer(cafeModel);
                 
@@ -168,7 +163,6 @@
             console.error('Error loading model:', error);
         });
 
-        // ฟังก์ชันสั่งสลับเปิด/ปิดประตู (โค้ดดั้งเดิมของคุณ)
         function toggleDoor() {
             if (!doorAction) return;
 
@@ -221,7 +215,7 @@
             );
         }
 
-        // ระบบคลิกตรวจจับประตู (รองรับทั้งชื่อ door, gate และ cube ชิ้นส่วนประตู)
+        // ปรับการตรวจจับคลิกให้รองรับชิ้นส่วนประตู (Cube / Cube.001 ใน Blender)
         window.addEventListener('click', (event) => {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -234,6 +228,7 @@
                     const clickedObj = intersects[0].object;
                     const name = clickedObj.name.toLowerCase();
 
+                    // ตรวจจับทั้ง door, gate และ cube (ชิ้นส่วนประตูจริงใน Blender)
                     if (name.includes('door') || name.includes('gate') || name.includes('cube')) {
                         toggleDoor();
                     } else if (name.includes('frame') || name.includes('photo') || name.includes('selfie')) {
@@ -248,7 +243,6 @@
         function animate() {
             requestAnimationFrame(animate);
             
-            // ส่งค่าเวลาให้ Shader เรืองแสง
             pinkShaderMaterial.uniforms.time.value = clock.getElapsedTime();
 
             const delta = clock.getDelta();
