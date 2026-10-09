@@ -65,7 +65,7 @@
         <button class="ui-btn" onclick="focusCV()">📜 ซูมดูประวัติ (CV)</button>
     </div>
 
-    <!-- Vertex & Fragment Shader สีชมพูพาสเทลสดใส -->
+    <!-- Vertex & Fragment Shader สีชมพูพาสเทลเรืองแสง -->
     <script id="vertexShader" type="x-shader/x-vertex">
         varying vec2 vUv;
         varying vec3 vNormal;
@@ -82,7 +82,7 @@
         varying vec3 vNormal;
 
         void main() {
-            float pulse = 0.85 + 0.15 * sin(time * 3.0 + vUv.x * 4.0);
+            float pulse = 0.82 + 0.18 * sin(time * 3.0 + vUv.x * 4.0);
             float rim = pow(1.0 - max(0.0, dot(vNormal, vec3(0.0, 0.0, 1.0))), 1.5);
             
             vec3 basePink = vec3(1.0, 0.35, 0.65) * pulse;
@@ -129,53 +129,54 @@
         });
 
         let cafeModel = null;
-        let doorOpenModel = null;
-        let doorClosedModel = null;
+        let mixer = null;
+        let doorAction = null;
         let isDoorOpen = false;
 
         const clock = new THREE.Clock();
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
-        const loader = new THREE.GLTFLoader();
 
-        // 1. โหลดฉากหลัก
+        const loader = new THREE.GLTFLoader();
         loader.load('catcafe.glb', (gltf) => {
             cafeModel = gltf.scene;
             scene.add(cafeModel);
 
-            // ใส่ Shader ที่ Awning
+            // ใส่วัสดุเรืองแสงสีชมพูที่กันสาด Awning
             cafeModel.traverse((child) => {
                 if (child.isMesh && child.name === 'Awning') {
                     child.material = pinkShaderMaterial;
                 }
-                // ซ่อนชิ้นส่วนประตูเดิมถ้ามีซ้ำ
-                if (child.name.toLowerCase().includes('cube')) {
-                    child.visible = false;
-                }
             });
+
+            // โหลด Animation ประตู
+            if (gltf.animations && gltf.animations.length > 0) {
+                mixer = new THREE.AnimationMixer(cafeModel);
+                
+                const doorClip = gltf.animations.find(clip => clip.name.toLowerCase().includes('door')) || gltf.animations[0];
+                
+                if (doorClip) {
+                    doorAction = mixer.clipAction(doorClip);
+                    doorAction.setLoop(THREE.LoopOnce);
+                    doorAction.clampWhenFinished = true;
+                }
+            }
+        }, undefined, (error) => {
+            console.error('Error loading model:', error);
         });
 
-        // 2. โหลดไฟล์ประตูตอนปิด (DoorClosing.glb)
-        loader.load('DoorClosing.glb', (gltf) => {
-            doorClosedModel = gltf.scene;
-            doorClosedModel.visible = true; // เริ่มต้นให้แสดงประตูแบบปิด
-            scene.add(doorClosedModel);
-        });
-
-        // 3. โหลดไฟล์ประตูตอนเปิด (DoorOpen.glb)
-        loader.load('DoorOpen.glb', (gltf) => {
-            doorOpenModel = gltf.scene;
-            doorOpenModel.visible = false; // เริ่มต้นซ่อนไว้ก่อน
-            scene.add(doorOpenModel);
-        });
-
-        // ฟังก์ชันสั่งสลับเปิด/ปิดประตู แบบสลับโมเดล ชัวร์ 100%
         function toggleDoor() {
-            isDoorOpen = !isDoorOpen;
+            if (!doorAction) return;
 
-            if (doorClosedModel && doorOpenModel) {
-                doorClosedModel.visible = !isDoorOpen;
-                doorOpenModel.visible = isDoorOpen;
+            doorAction.paused = false;
+            if (!isDoorOpen) {
+                doorAction.timeScale = 1;
+                doorAction.play();
+                isDoorOpen = true;
+            } else {
+                doorAction.timeScale = -1;
+                doorAction.play();
+                isDoorOpen = false;
             }
         }
 
@@ -210,27 +211,32 @@
             moveCamera({ x: -1.0, y: 3.5, z: 7.0 }, { x: -1.0, y: 2.0, z: 0.0 });
         }
 
-        // ระบบคลิกตรวจจับประตู
+        // เช็กการคลิกแบบวนหาทุกวัตถุที่ตัดผ่าน (Deep Raycast Inspection)
         window.addEventListener('click', (event) => {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
             raycaster.setFromCamera(mouse, camera);
             
-            const interactiveObjects = scene.children;
-            const intersects = raycaster.intersectObjects(interactiveObjects, true);
+            if (cafeModel) {
+                const intersects = raycaster.intersectObjects(cafeModel.children, true);
+                
+                for (let i = 0; i < intersects.length; i++) {
+                    const obj = intersects[i].object;
+                    const name = obj.name.toLowerCase();
+                    const parentName = obj.parent ? obj.parent.name.toLowerCase() : '';
 
-            if (intersects.length > 0) {
-                const clickedObj = intersects[0].object;
-                const name = clickedObj.name.toLowerCase();
-
-                // ถ้าคลิกโดนชิ้นส่วนประตูใดๆ
-                if (name.includes('door') || name.includes('gate') || name.includes('cube') || intersects[0].object.parent === doorClosedModel || intersects[0].object.parent === doorOpenModel) {
-                    toggleDoor();
-                } else if (name.includes('frame') || name.includes('photo') || name.includes('selfie')) {
-                    focusPhoto();
-                } else if (name.includes('cv') || name.includes('text')) {
-                    focusCV();
+                    // เช็กคลิกโดนประตู (รองรับชื่อ door, gate, cube หรือ parent ของมัน)
+                    if (name.includes('door') || name.includes('gate') || name.includes('cube') || parentName.includes('door')) {
+                        toggleDoor();
+                        break;
+                    } else if (name.includes('frame') || name.includes('photo') || name.includes('selfie')) {
+                        focusPhoto();
+                        break;
+                    } else if (name.includes('cv') || name.includes('text')) {
+                        focusCV();
+                        break;
+                    }
                 }
             }
         });
@@ -239,6 +245,9 @@
             requestAnimationFrame(animate);
             
             pinkShaderMaterial.uniforms.time.value = clock.getElapsedTime();
+
+            const delta = clock.getDelta();
+            if (mixer) mixer.update(delta);
 
             controls.update();
             renderer.render(scene, camera);
