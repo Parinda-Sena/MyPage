@@ -65,7 +65,7 @@
         <button class="ui-btn" onclick="focusCV()">📜 ซูมดูประวัติ (CV)</button>
     </div>
 
-    <!-- Custom Shader เรืองแสงสีชมพูพาสเทลสำหรับป้าย catcafe -->
+    <!-- 2. Custom Shader สำหรับป้าย _catcafe (แสงสีชมพูพาสเทล) -->
     <script id="vertexShader" type="x-shader/x-vertex">
         varying vec2 vUv;
         varying vec3 vNormal;
@@ -97,7 +97,7 @@
         scene.background = new THREE.Color(0xf4ece1);
 
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        // ข้อ 1: ขยับมุมกล้องออกไปให้เห็นทั้งหมด
+        // 1. ปรับมุมกล้องถอยออกไปให้เห็นทั้งฉาก
         const defaultCamPos = { x: 0, y: 7.0, z: 18.0 };
         const defaultTarget = { x: 0, y: 2.0, z: 0 };
         camera.position.set(defaultCamPos.x, defaultCamPos.y, defaultCamPos.z);
@@ -123,7 +123,7 @@
         controls.enableDamping = true;
         controls.target.set(defaultTarget.x, defaultTarget.y, defaultTarget.z);
 
-        // ข้อ 2: Material Shader สำหรับใส่ป้าย catcafe
+        // 2. สร้าง ShaderMaterial สีชมพูพาสเทล
         const signShaderMaterial = new THREE.ShaderMaterial({
             vertexShader: document.getElementById('vertexShader').textContent,
             fragmentShader: document.getElementById('fragmentShader').textContent,
@@ -144,14 +144,14 @@
             cafeModel = gltf.scene;
             scene.add(cafeModel);
 
-            // ข้อ 2: ใส่ Shader เฉพาะป้าย _catcafe เท่านั้น
+            // 2. ใส่ ShaderMaterial เฉพาะชิ้นส่วนชื่อ _catcafe
             cafeModel.traverse((child) => {
                 if (child.isMesh && child.name === '_catcafe') {
                     child.material = signShaderMaterial;
                 }
             });
 
-            // ตั้งค่า Animation Mixer เมื่อโหลดไฟล์สำเร็จ
+            // ตั้งค่า Animation Mixer เมื่อโหลดไฟล์สำเร็จ (โค้ดเดิมของคุณ)
             if (gltf.animations && gltf.animations.length > 0) {
                 mixer = new THREE.AnimationMixer(cafeModel);
                 
@@ -168,7 +168,7 @@
             console.error('Error loading model:', error);
         });
 
-        // ฟังก์ชันสั่งสลับเปิด/ปิดประตู
+        // ฟังก์ชันสั่งสลับเปิด/ปิดประตู (โค้ดเดิมของคุณ)
         function toggleDoor() {
             if (!doorAction) return;
 
@@ -205,26 +205,26 @@
             });
         }
 
-        // ข้อ 1: ฟังก์ชันปุ่มมุมมองหลัก
+        // 1. ฟังก์ชันปุ่มหน้าหลัก
         function focusMainView() {
             moveCamera(defaultCamPos, defaultTarget);
         }
 
         function focusCV() {
             moveCamera(
-                { x: 0.0, y: 6.5, z: 11.0 }, 
-                { x: 0.0, y: 0.5, z: 2.0 }
+                { x: 0.0, y: 4.5, z: 8.0 }, 
+                { x: 0.0, y: 0.5, z: 1.5 }
             );
         }
 
         function focusPhoto() {
             moveCamera(
-                { x: -1.0, y: 2.8, z: 8.5 }, 
+                { x: -1.0, y: 3.5, z: 7.0 }, 
                 { x: -1.0, y: 2.0, z: 0.0 }
             );
         }
 
-        // คลิกตรวจจับชิ้นส่วนประตูเพื่อเปิด/ปิด
+        // คลิกตรวจจับชิ้นส่วนประตูเพื่อเปิด/ปิด (โค้ดเดิมของคุณ)
         window.addEventListener('click', (event) => {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -251,10 +251,10 @@
         function animate() {
             requestAnimationFrame(animate);
             
-            // อัปเดตเวลาให้ Shader
+            // 2. อัปเดตเวลาให้ Shader ทำงาน
             signShaderMaterial.uniforms.time.value = clock.getElapsedTime();
 
-            // อัปเดตเฟรม Animation mixer ในแต่ละเฟรม
+            // อัปเดตเฟรม Animation mixer ในแต่ละเฟรม (โค้ดเดิมของคุณ)
             const delta = clock.getDelta();
             if (mixer) mixer.update(delta);
 
