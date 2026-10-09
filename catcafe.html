@@ -293,43 +293,40 @@
                 // APPLY SHADER ONLY TO CAT CAFE TEXT
                 // =====================================
 
-                cafeModel.traverse(function (object) {
-                    if (!object.isMesh) {
-                        return;
-                    }
+               
+cafeModel.traverse(function (object) {
+    if (!object.isMesh) {
+        return;
+    }
 
-                    const objectName =
-                        object.name.toLowerCase().trim();
+    // เลือกเฉพาะ Mesh ตัวอักษรบนป้าย CAT CAFE
+    if (
+        object.name === 'Sign_Name_3D' ||
+        object.name === 'Sign_Name_3D003'
+    ) {
+        object.material = new THREE.ShaderMaterial({
+            vertexShader: catCafeVertexShader,
+            fragmentShader: catCafeFragmentShader,
 
-                    const materialName =
-                        Array.isArray(object.material)
-                            ? object.material.map(
-                                material =>
-                                    material.name.toLowerCase()
-                            ).join(' ')
-                            : (
-                                object.material?.name || ''
-                            ).toLowerCase();
+            uniforms: {
+                glowColor: {
+                    value: new THREE.Color(0x66ddff)
+                },
 
-                    const isCatCafeText =
-                        objectName.includes('cat cafe') ||
-                        objectName.includes('cat_cafe') ||
-                        objectName.includes('catcafe') ||
-                        materialName.includes('cat cafe') ||
-                        materialName.includes('cat_cafe') ||
-                        materialName.includes('catcafe');
+                glowIntensity: {
+                    value: 2.5
+                }
+            },
 
-                    if (isCatCafeText) {
-                        console.log(
-                            'Applying CAT CAFE Shader:',
-                            object.name
-                        );
+            side: THREE.DoubleSide
+        });
 
-                        object.material =
-                            createCatCafeMaterial();
-                    }
-                });
-
+        console.log(
+            'CAT CAFE Shader applied:',
+            object.name
+        );
+    }
+});
                 // =====================================
                 // ORIGINAL ANIMATION
                 // =====================================
