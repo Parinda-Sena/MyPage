@@ -86,7 +86,7 @@
         varying vec3 vNormal;
 
         void main() {
-            // เอฟเฟกต์เรืองแสงแบบนีออนโทนขาวอุ่น เคลื่อนไหวเป็นจังหวะ
+            // เอฟเฟกต์เรืองแสงแบบนีออนสีขาวนวล
             float glow = 0.85 + 0.15 * sin(time * 3.0 + vUv.y * 4.0);
             float edge = pow(1.0 - max(0.0, dot(vNormal, vec3(0.0, 0.0, 1.0))), 1.5);
             
@@ -99,7 +99,6 @@
 
     <script>
         const scene = new THREE.Scene();
-        // เปลี่ยนพื้นหลังเป็นโทนอุ่นสไตล์คลาสสิก ดึงโมเดลให้เด่น
         scene.background = new THREE.Color(0x362f2d);
 
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -111,13 +110,13 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap; // เงานุ่ม
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         renderer.outputEncoding = THREE.sRGBEncoding;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.15;
         document.body.appendChild(renderer.domElement);
 
-        // --- ระบบจัดแสงใหม่ให้โมเดลมีมิติสวยงาม ---
+        // ระบบแสงบรรยากาศ
         const hemiLight = new THREE.HemisphereLight(0xfff0e6, 0x443322, 0.8);
         scene.add(hemiLight);
 
@@ -129,7 +128,6 @@
         dirLight.shadow.bias = -0.0001;
         scene.add(dirLight);
 
-        // แสงส้มอุ่นส่องสว่างด้านหน้าเพิ่มมิติ
         const pointLight = new THREE.PointLight(0xffaa55, 0.6, 15);
         pointLight.position.set(0, 4, 6);
         scene.add(pointLight);
@@ -139,17 +137,16 @@
         controls.dampingFactor = 0.05;
         controls.target.set(defaultTarget.x, defaultTarget.y, defaultTarget.z);
 
-        // Shader Material เฉพาะป้าย
+        // Shader Material สำหรับป้าย CAT CAFE และ Menu เท่านั้น
         const labelShaderMaterial = new THREE.ShaderMaterial({
             vertexShader: document.getElementById('vertexShader').textContent,
             fragmentShader: document.getElementById('fragmentShader').textContent,
             uniforms: { time: { value: 0.0 } }
         });
 
-        // วัสดุปรับแต่งเฉพาะจุด
-        const cvDarkMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x1a2436, 
-            roughness: 0.3 
+        // วัสดุสีดำสำหรับตัวอักษร CV (ไม่มี Shader)
+        const cvBlackMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x000000 
         });
 
         let cafeModel = null;
@@ -173,13 +170,13 @@
                     
                     const name = child.name.toLowerCase();
 
-                    // 1. ใส่ Shader เฉพาะป้าย CAT CAFE และเมนู
+                    // 1. ใส่ Shader เรืองแสงเฉพาะป้าย CAT CAFE และ เมนู
                     if (name.includes('cafe') || name.includes('menu') || name.includes('latte') || name.includes('sign')) {
                         child.material = labelShaderMaterial;
                     } 
-                    // 2. ปรับตัวหนังสือ CV เป็นสีเข้มอ่านง่าย ชัดเจนบนพื้น
-                    else if (name.includes('cv') || name.includes('text') || name.includes('parinda') || name.includes('education')) {
-                        child.material = cvDarkMaterial;
+                    // 2. ตัวหนังสือ CV ทั้งหมดปรับเป็นสีดำบริสุทธิ์ ไม่มี Shader
+                    else if (name.includes('cv') || name.includes('text') || name.includes('parinda') || name.includes('education') || name.includes('age') || name.includes('faculty') || name.includes('kasetsart')) {
+                        child.material = cvBlackMaterial;
                     }
                 }
             });
@@ -239,37 +236,4 @@
 
         window.addEventListener('click', (event) => {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-            raycaster.setFromCamera(mouse, camera);
-            
-            if (cafeModel) {
-                const intersects = raycaster.intersectObjects(cafeModel.children, true);
-                if (intersects.length > 0) {
-                    const name = intersects[0].object.name.toLowerCase();
-                    if (name.includes('door') || name.includes('gate')) toggleDoor();
-                    else if (name.includes('frame') || name.includes('photo')) focusPhoto();
-                    else if (name.includes('cv') || name.includes('text')) focusCV();
-                }
-            }
-        });
-
-        function animate() {
-            requestAnimationFrame(animate);
-            const delta = clock.getDelta();
-            
-            labelShaderMaterial.uniforms.time.value = clock.getElapsedTime();
-            if (mixer) mixer.update(delta);
-
-            controls.update();
-            renderer.render(scene, camera);
-        }
-        animate();
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-    </script>
-</body>
-</html>
+            mouse.y = -(event.clientY /
