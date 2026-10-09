@@ -64,45 +64,6 @@
         <button class="ui-btn" onclick="focusCV()">📜 ซูมดูประวัติ (CV)</button>
     </div>
 
-    <!-- Vertex Shader เพิ่มเติม -->
-    <script id="vertexShader" type="x-shader/x-vertex">
-        varying vec2 vUv;
-        varying vec3 vWorldNormal;
-        varying vec3 vWorldPosition;
-
-        void main() {
-            vUv = uv;
-            vWorldNormal = normalize(mat3(modelMatrix) * normal);
-            vec4 worldPos = modelMatrix * vec4(position, 1.0);
-            vWorldPosition = worldPos.xyz;
-            gl_Position = projectionMatrix * viewMatrix * worldPos;
-        }
-    </script>
-
-    <!-- Fragment Shader เพิ่มเติม -->
-    <script id="fragmentShader" type="x-shader/x-fragment">
-        uniform sampler2D mainTexture;
-        uniform bool hasTexture;
-        uniform vec3 lightPosition;
-        uniform vec3 baseColor;
-
-        varying vec2 vUv;
-        varying vec3 vWorldNormal;
-        varying vec3 vWorldPosition;
-
-        void main() {
-            vec4 color = hasTexture ? texture2D(mainTexture, vUv) : vec4(baseColor, 1.0);
-            vec3 normal = normalize(vWorldNormal);
-            vec3 lightDir = normalize(lightPosition - vWorldPosition);
-
-            float ambient = 0.65; 
-            float diffuse = max(dot(normal, lightDir), 0.0) * 0.35;
-            float lightIntensity = ambient + diffuse;
-
-            gl_FragColor = vec4(color.rgb * lightIntensity, color.a);
-        }
-    </script>
-
     <script>
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0xf4ece1);
@@ -133,26 +94,6 @@
         controls.enableDamping = true;
         controls.target.set(defaultTarget.x, defaultTarget.y, defaultTarget.z);
 
-        // ฟังก์ชันประยุกต์ใช้ ShaderMaterial โดยคงค่าคุณสมบัติเดิมไว้ทั้งหมด
-        function applyCustomShader(material) {
-            if (!material) return new THREE.MeshBasicMaterial();
-            const map = material.map || null;
-            const color = material.color ? material.color : new THREE.Color(0xffffff);
-
-            return new THREE.ShaderMaterial({
-                vertexShader: document.getElementById('vertexShader').textContent,
-                fragmentShader: document.getElementById('fragmentShader').textContent,
-                uniforms: {
-                    mainTexture: { value: map },
-                    hasTexture: { value: map !== null },
-                    lightPosition: { value: dirLight.position },
-                    baseColor: { value: color }
-                },
-                transparent: material.transparent || false,
-                side: THREE.DoubleSide
-            });
-        }
-
         let cafeModel = null;
         let mixer = null;
         let doorAction = null;
@@ -165,14 +106,6 @@
         const loader = new THREE.GLTFLoader();
         loader.load('catcafe.glb', (gltf) => {
             cafeModel = gltf.scene;
-
-            // นำ Vertex และ Fragment Shader ไปใช้กับทุก Mesh ในโมเดล
-            cafeModel.traverse((child) => {
-                if (child.isMesh) {
-                    child.material = applyCustomShader(child.material);
-                }
-            });
-
             scene.add(cafeModel);
 
             // ตั้งค่า Animation Mixer เมื่อโหลดไฟล์สำเร็จ
@@ -232,18 +165,18 @@
 
         function focusCV() {
 
-            moveCamera(
-                { x: 0.0, y: 4.5, z: 8.0 }, 
-                { x: 0.0, y: 0.5, z: 1.5 }
-            );
-        }
+    moveCamera(
+        { x: 0.0, y: 4.5, z: 8.0 }, 
+        { x: 0.0, y: 0.5, z: 1.5 }
+    );
+}
 
-        function focusPhoto() {
-            moveCamera(
-                { x: -1.0, y: 3.5, z: 7.0 }, 
-                { x: -1.0, y: 2.0, z: 0.0 }
-            );
-        }
+function focusPhoto() {
+    moveCamera(
+        { x: -1.0, y: 3.5, z: 7.0 }, 
+        { x: -1.0, y: 2.0, z: 0.0 }
+    );
+}
         // คลิกตรวจจับชิ้นส่วนประตูเพื่อเปิด/ปิด
         window.addEventListener('click', (event) => {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
