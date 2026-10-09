@@ -65,37 +65,6 @@
         <button class="ui-btn" onclick="focusCV()">📜 ซูมดูประวัติ (CV)</button>
     </div>
 
-    <!-- ==================== CUSTOM SHADERS ==================== -->
-    <script id="vertexShader" type="x-shader/x-vertex">
-        varying vec2 vUv;
-        varying vec3 vNormal;
-        
-        void main() {
-            vUv = uv;
-            vNormal = normalize(normalMatrix * normal);
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-    </script>
-
-    <script id="fragmentShader" type="x-shader/x-fragment">
-        uniform float time;
-        uniform vec3 glowColor;
-        varying vec2 vUv;
-        varying vec3 vNormal;
-
-        void main() {
-            // คำนวณคลื่นเรืองแสงขยับตามเวลา (Sine wave)
-            float glow = 0.5 + 0.5 * sin(time * 3.0 + vUv.y * 10.0);
-            
-            // เอฟเฟกต์แสงสะท้อนขอบ Rim Light
-            float intensity = pow(0.7 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
-            
-            vec3 finalColor = glowColor * (glow * 0.6 + 0.4) + vec3(intensity * 0.5);
-            gl_FragColor = vec4(finalColor, 1.0);
-        }
-    </script>
-    <!-- ======================================================== -->
-
     <script>
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0xf4ece1);
@@ -114,7 +83,7 @@
         renderer.toneMappingExposure = 1.0;
         document.body.appendChild(renderer.domElement);
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
         scene.add(ambientLight);
 
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -126,16 +95,6 @@
         controls.enableDamping = true;
         controls.target.set(defaultTarget.x, defaultTarget.y, defaultTarget.z);
 
-        // --- สร้าง CUSTOM SHADER MATERIAL สำหรับป้ายเรืองแสง ---
-        const glowMaterial = new THREE.ShaderMaterial({
-            vertexShader: document.getElementById('vertexShader').textContent,
-            fragmentShader: document.getElementById('fragmentShader').textContent,
-            uniforms: {
-                time: { value: 0.0 },
-                glowColor: { value: new THREE.Color(0xffa500) } // สีกระพริบเรืองแสง (โทนส้มอบอุ่น)
-            }
-        });
-
         let cafeModel = null;
         let mixer = null;
         let doorAction = null;
@@ -145,46 +104,65 @@
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
+        // วัสดุสีมาตรฐานสำหรับปรับสีตัวอักษร
+        const whiteMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff }); // สีขาว
+        const blackMaterial = new THREE.MeshBasicMaterial({ color: 0x111111 }); // สีดำ
+
         const loader = new THREE.GLTFLoader();
         loader.load('catcafe.glb', (gltf) => {
             cafeModel = gltf.scene;
             scene.add(cafeModel);
 
-            // ค้นหาและเปลี่ยนวัสดุป้าย (เช่น ป้าย CAT CAFE หรือป้ายเมนู) ให้ใช้ ShaderMaterial เรืองแสง
+            // วนลูปเปลี่ยนสีตัวอักษรตามที่ต้องการ
             cafeModel.traverse((child) => {
                 if (child.isMesh) {
                     const name = child.name.toLowerCase();
-                    // ตรวจหาชิ้นส่วนที่มีคำว่า sign, cafe, menu หรือ board
-                    if (name.includes('sign') || name.includes('cafe') || name.includes('menu')) {
-                        child.material = glowMaterial;
+
+                    // ป้าย CAT CAFE และ ป้ายเมนูอาหาร -> เปลี่ยนตัวอักษรเป็นสีขาว
+                    if (name.includes('cafe') || name.includes('menu') || name.includes('latte') || name.includes('text_menu')) {
+                        child.material = whiteMaterial;
+                    } 
+                    // ข้อความ CV -> เปลี่ยนเป็นสีดำ
+                    else if (name.includes('cv') || name.includes('parinda') || name.includes('education') || name.includes('age')) {
+                        child.material = blackMaterial;
                     }
                 }
             });
 
+            // ตั้งค่าระบบ Animation เปิด/ปิดประตู
             if (gltf.animations && gltf.animations.length > 0) {
+                console.log("Found Animations:", gltf.animations);
                 mixer = new THREE.AnimationMixer(cafeModel);
-                const doorClip = gltf.animations.find(clip => clip.name.toLowerCase().includes('door')) || gltf.animations[0];
-                
+
+                // พยายามหาคลิปชื่อประตู หากไม่เจอจะดึง Animation คลิปแรกในไฟล์มาเล่นทันที
+                const doorClip = gltf.animations.find(clip => clip.name.toLowerCase().includes('door') || clip.name.toLowerCase().includes('gate') || clip.name.toLowerCase().includes('open')) || gltf.animations[0];
+
                 if (doorClip) {
                     doorAction = mixer.clipAction(doorClip);
                     doorAction.setLoop(THREE.LoopOnce);
-                    doorAction.clampWhenFinished = true;
+                    doorAction.clampWhenFinished = true; // เปิดค้างไว้เมื่อเล่นจบ
                 }
+            } else {
+                console.warn("No animations found in catcafe.glb");
             }
         }, undefined, (error) => {
             console.error('Error loading model:', error);
         });
 
+        // ฟังก์ชันสั่งเปิด/ปิดประตู
         function toggleDoor() {
-            if (!doorAction) return;
+            if (!doorAction) {
+                console.warn("Door action is not ready or missing.");
+                return;
+            }
 
             doorAction.paused = false;
             if (!isDoorOpen) {
-                doorAction.timeScale = 1;
+                doorAction.timeScale = 1; // เล่น Animation เดินหน้า (เปิด)
                 doorAction.play();
                 isDoorOpen = true;
             } else {
-                doorAction.timeScale = -1;
+                doorAction.timeScale = -1; // เล่น Animation ย้อนกลับ (ปิด)
                 doorAction.play();
                 isDoorOpen = false;
             }
@@ -229,7 +207,7 @@
 
         window.addEventListener('click', (event) => {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            mouse.y = -(event.clientY / window.innerWidth) * 2 + 1;
 
             raycaster.setFromCamera(mouse, camera);
             
@@ -239,7 +217,7 @@
                     const clickedObj = intersects[0].object;
                     const name = clickedObj.name.toLowerCase();
 
-                    if (name.includes('door') || name.includes('gate')) {
+                    if (name.includes('door') || name.includes('gate') || name.includes('cube')) {
                         toggleDoor();
                     } else if (name.includes('frame') || name.includes('photo') || name.includes('selfie')) {
                         focusPhoto();
@@ -253,12 +231,8 @@
         function animate() {
             requestAnimationFrame(animate);
             
-            const elapsedTime = clock.getElapsedTime();
-
-            // อัปเดตค่า time ใน Shader เพื่อให้เอฟเฟกต์เรืองแสงเคลื่อนไหวไดนามิก
-            glowMaterial.uniforms.time.value = elapsedTime;
-
-            if (mixer) mixer.update(clock.getDelta());
+            const delta = clock.getDelta();
+            if (mixer) mixer.update(delta);
 
             controls.update();
             renderer.render(scene, camera);
