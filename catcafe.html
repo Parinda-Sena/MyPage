@@ -58,6 +58,7 @@
             color: #5a3d31;
             pointer-events: none;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            z-index: 10;
         }
     </style>
 
@@ -80,6 +81,10 @@
     </div>
 
     <script>
+        // =========================================
+        // SCENE
+        // =========================================
+
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0xf4ece1);
 
@@ -90,8 +95,18 @@
             1000
         );
 
-        const defaultCamPos = { x: 0, y: 3.5, z: 9 };
-        const defaultTarget = { x: 0, y: 1.2, z: 0 };
+        // ปรับกล้องให้เห็นร้านและหัวแมวครบขึ้น
+        const defaultCamPos = {
+            x: 0,
+            y: 5.5,
+            z: 16
+        };
+
+        const defaultTarget = {
+            x: 0,
+            y: 2.5,
+            z: 0
+        };
 
         camera.position.set(
             defaultCamPos.x,
@@ -99,9 +114,19 @@
             defaultCamPos.z
         );
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
+        const renderer = new THREE.WebGLRenderer({
+            antialias: true
+        });
+
+        renderer.setSize(
+            window.innerWidth,
+            window.innerHeight
+        );
+
+        renderer.setPixelRatio(
+            window.devicePixelRatio
+        );
+
         renderer.shadowMap.enabled = true;
         renderer.outputEncoding = THREE.sRGBEncoding;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -109,10 +134,18 @@
 
         document.body.appendChild(renderer.domElement);
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        const ambientLight = new THREE.AmbientLight(
+            0xffffff,
+            0.7
+        );
+
         scene.add(ambientLight);
 
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        const dirLight = new THREE.DirectionalLight(
+            0xffffff,
+            0.8
+        );
+
         dirLight.position.set(5, 10, 7);
         dirLight.castShadow = true;
         scene.add(dirLight);
@@ -123,11 +156,16 @@
         );
 
         controls.enableDamping = true;
+
         controls.target.set(
             defaultTarget.x,
             defaultTarget.y,
             defaultTarget.z
         );
+
+        // =========================================
+        // MODEL VARIABLES
+        // =========================================
 
         let cafeModel = null;
         let mixer = null;
@@ -138,9 +176,11 @@
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
-        // ==========================================
-        // Vertex Shader: เฉพาะตัวอักษร CAT CAFE
-        // ==========================================
+        // =========================================
+        // VERTEX SHADER
+        // ใช้กับตัวอักษร CAT CAFE เท่านั้น
+        // =========================================
+
         const catCafeVertexShader = `
             varying vec3 vNormal;
             varying vec3 vViewPosition;
@@ -158,9 +198,11 @@
             }
         `;
 
-        // ==========================================
-        // Fragment Shader: เอฟเฟกต์เรืองแสง CAT CAFE
-        // ==========================================
+        // =========================================
+        // FRAGMENT SHADER
+        // ทำสีตัวอักษรและขอบเรืองแสง
+        // =========================================
+
         const catCafeFragmentShader = `
             uniform vec3 glowColor;
             uniform float glowIntensity;
@@ -177,7 +219,11 @@
                     2.0
                 );
 
-                vec3 baseColor = vec3(0.15, 0.75, 1.0);
+                vec3 baseColor = vec3(
+                    0.10,
+                    0.75,
+                    1.0
+                );
 
                 vec3 finalColor =
                     baseColor +
@@ -187,59 +233,130 @@
             }
         `;
 
+        // =========================================
+        // CREATE CAT CAFE GLOW MATERIAL
+        // =========================================
+
+        function createCatCafeMaterial() {
+            return new THREE.ShaderMaterial({
+                vertexShader: catCafeVertexShader,
+                fragmentShader: catCafeFragmentShader,
+
+                uniforms: {
+                    glowColor: {
+                        value: new THREE.Color(0x66ddff)
+                    },
+
+                    glowIntensity: {
+                        value: 1.5
+                    }
+                },
+
+                side: THREE.DoubleSide
+            });
+        }
+
+        // =========================================
+        // LOAD GLB MODEL
+        // =========================================
+
         const loader = new THREE.GLTFLoader();
 
         loader.load(
             'catcafe.glb',
 
-            (gltf) => {
+            function (gltf) {
                 cafeModel = gltf.scene;
+
+                // ตรวจชื่อ Mesh และ Material ทุกชิ้น
+                // ดูผลได้ใน Developer Tools > Console
+                cafeModel.traverse(function (object) {
+                    if (!object.isMesh) {
+                        return;
+                    }
+
+                    console.log(
+                        'Mesh name:',
+                        object.name,
+                        '| Material:',
+                        Array.isArray(object.material)
+                            ? object.material.map(
+                                material => material.name
+                            )
+                            : object.material?.name
+                    );
+                });
+
                 scene.add(cafeModel);
 
-                // เปลี่ยนวัสดุเฉพาะ Mesh ที่เป็นตัวอักษร CAT CAFE
-                cafeModel.traverse((object) => {
-                    if (!object.isMesh) return;
+                // =====================================
+                // APPLY SHADER ONLY TO CAT CAFE TEXT
+                // =====================================
 
-                    const name = object.name.toLowerCase();
+                cafeModel.traverse(function (object) {
+                    if (!object.isMesh) {
+                        return;
+                    }
 
-                    if (
-                        name.includes('cat cafe') ||
-                        name.includes('cat_cafe') ||
-                        name.includes('catcafe')
-                    ) {
+                    const objectName =
+                        object.name.toLowerCase().trim();
+
+                    const materialName =
+                        Array.isArray(object.material)
+                            ? object.material.map(
+                                material =>
+                                    material.name.toLowerCase()
+                            ).join(' ')
+                            : (
+                                object.material?.name || ''
+                            ).toLowerCase();
+
+                    const isCatCafeText =
+                        objectName.includes('cat cafe') ||
+                        objectName.includes('cat_cafe') ||
+                        objectName.includes('catcafe') ||
+                        materialName.includes('cat cafe') ||
+                        materialName.includes('cat_cafe') ||
+                        materialName.includes('catcafe');
+
+                    if (isCatCafeText) {
+                        console.log(
+                            'Applying CAT CAFE Shader:',
+                            object.name
+                        );
+
                         object.material =
-                            new THREE.ShaderMaterial({
-                                vertexShader: catCafeVertexShader,
-                                fragmentShader: catCafeFragmentShader,
-
-                                uniforms: {
-                                    glowColor: {
-                                        value: new THREE.Color(0x66ddff)
-                                    },
-
-                                    glowIntensity: {
-                                        value: 1.5
-                                    }
-                                }
-                            });
+                            createCatCafeMaterial();
                     }
                 });
 
-                // Animation เดิมของโมเดล
+                // =====================================
+                // ORIGINAL ANIMATION
+                // =====================================
+
                 if (
                     gltf.animations &&
                     gltf.animations.length > 0
                 ) {
-                    mixer = new THREE.AnimationMixer(cafeModel);
+                    mixer = new THREE.AnimationMixer(
+                        cafeModel
+                    );
 
-                    const doorClip = gltf.animations.find(
-                        clip =>
-                            clip.name.toLowerCase().includes('door')
-                    ) || gltf.animations[0];
+                    const doorClip =
+                        gltf.animations.find(
+                            clip =>
+                                clip.name.toLowerCase()
+                                    .includes('door')
+                        ) || gltf.animations[0];
 
                     if (doorClip) {
-                        doorAction = mixer.clipAction(doorClip);
-                        doorAction.setLoop(THREE.LoopOnce);
+                        doorAction =
+                            mixer.clipAction(doorClip);
+
+                        doorAction.setLoop(
+                            THREE.LoopOnce
+                        );
+
                         doorAction.clampWhenFinished = true;
                     }
                 }
@@ -247,14 +364,22 @@
 
             undefined,
 
-            (error) => {
-                console.error('Error loading model:', error);
+            function (error) {
+                console.error(
+                    'Error loading model:',
+                    error
+                );
             }
         );
 
-        // เปิด/ปิดประตู
+        // =========================================
+        // TOGGLE DOOR
+        // =========================================
+
         function toggleDoor() {
-            if (!doorAction) return;
+            if (!doorAction) {
+                return;
+            }
 
             doorAction.paused = false;
 
@@ -269,8 +394,14 @@
             }
         }
 
-        // เปลี่ยนมุมกล้อง
-        function moveCamera(targetCamPos, targetLookAt) {
+        // =========================================
+        // CAMERA MOVEMENT
+        // =========================================
+
+        function moveCamera(
+            targetCamPos,
+            targetLookAt
+        ) {
             gsap.to(camera.position, {
                 x: targetCamPos.x,
                 y: targetCamPos.y,
@@ -285,28 +416,56 @@
                 z: targetLookAt.z,
                 duration: 1.8,
                 ease: "power2.inOut",
-                onUpdate: () => controls.update()
+
+                onUpdate: function () {
+                    controls.update();
+                }
             });
         }
 
-        // ซูมประวัติ CV
+        // =========================================
+        // FOCUS CV
+        // =========================================
+
         function focusCV() {
             moveCamera(
-                { x: 0.0, y: 4.5, z: 8.0 },
-                { x: 0.0, y: 0.5, z: 1.5 }
+                {
+                    x: 0.0,
+                    y: 4.5,
+                    z: 8.0
+                },
+                {
+                    x: 0.0,
+                    y: 0.5,
+                    z: 1.5
+                }
             );
         }
 
-        // ซูมรูปโปรไฟล์
+        // =========================================
+        // FOCUS PROFILE PHOTO
+        // =========================================
+
         function focusPhoto() {
             moveCamera(
-                { x: -1.0, y: 3.5, z: 7.0 },
-                { x: -1.0, y: 2.0, z: 0.0 }
+                {
+                    x: -1.0,
+                    y: 3.5,
+                    z: 7.0
+                },
+                {
+                    x: -1.0,
+                    y: 2.0,
+                    z: 0.0
+                }
             );
         }
 
-        // คลิกตรวจจับชิ้นส่วนของโมเดล
-        window.addEventListener('click', (event) => {
+        // =========================================
+        // CLICK MODEL PARTS
+        // =========================================
+
+        window.addEventListener('click', function (event) {
             mouse.x =
                 (event.clientX / window.innerWidth) * 2 - 1;
 
@@ -323,8 +482,11 @@
                     );
 
                 if (intersects.length > 0) {
-                    const clickedObj = intersects[0].object;
-                    const name = clickedObj.name.toLowerCase();
+                    const clickedObj =
+                        intersects[0].object;
+
+                    const name =
+                        clickedObj.name.toLowerCase();
 
                     if (
                         name.includes('door') ||
@@ -347,7 +509,10 @@
             }
         });
 
-        // วนลูปแสดงผล
+        // =========================================
+        // ANIMATION LOOP
+        // =========================================
+
         function animate() {
             requestAnimationFrame(animate);
 
@@ -358,13 +523,13 @@
             }
 
             controls.update();
+
             renderer.render(scene, camera);
         }
 
         animate();
 
-        // ปรับขนาดเมื่อเปลี่ยนขนาดหน้าต่าง
-        window.addEventListener('resize', () => {
+        window.addEventListener('resize', function () {
             camera.aspect =
                 window.innerWidth / window.innerHeight;
 
