@@ -63,8 +63,36 @@
         <button class="ui-btn" onclick="toggleDoor()">🚪 เปิด/ปิดประตู</button>
         <button class="ui-btn" onclick="focusPhoto()">🖼️ ซูมรูปโปรไฟล์</button>
         <button class="ui-btn" onclick="focusCV()">📜 ซูมดูประวัติ (CV)</button>
-
     </div>
+
+    <!-- Vertex & Fragment Shader เรืองแสงสีชมพูพาสเทล -->
+    <script id="vertexShader" type="x-shader/x-vertex">
+        varying vec2 vUv;
+        varying vec3 vNormal;
+        void main() {
+            vUv = uv;
+            vNormal = normalize(normalMatrix * normal);
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+    </script>
+
+    <script id="fragmentShader" type="x-shader/x-fragment">
+        uniform float time;
+        varying vec2 vUv;
+        varying vec3 vNormal;
+
+        void main() {
+            // คลื่นเรืองแสงกระพริบนุ่มๆ
+            float glow = 0.85 + 0.15 * sin(time * 2.5 + vUv.y * 5.0);
+            float rim = pow(1.0 - max(0.0, dot(vNormal, vec3(0.0, 0.0, 1.0))), 2.0);
+            
+            // สีชมพูพาสเทลสว่างอ่อนๆ
+            vec3 textColor = vec3(1.0, 0.82, 0.90) * glow;
+            vec3 neonRimColor = vec3(1.0, 0.45, 0.70) * rim * 1.4;
+            
+            gl_FragColor = vec4(textColor + neonRimColor, 1.0);
+        }
+    </script>
 
     <script>
         const scene = new THREE.Scene();
@@ -96,6 +124,13 @@
         controls.enableDamping = true;
         controls.target.set(defaultTarget.x, defaultTarget.y, defaultTarget.z);
 
+        // สร้าง Material จาก Vertex & Fragment Shader
+        const customShaderMaterial = new THREE.ShaderMaterial({
+            vertexShader: document.getElementById('vertexShader').textContent,
+            fragmentShader: document.getElementById('fragmentShader').textContent,
+            uniforms: { time: { value: 0.0 } }
+        });
+
         let cafeModel = null;
         let mixer = null;
         let doorAction = null;
@@ -110,35 +145,39 @@
             cafeModel = gltf.scene;
             scene.add(cafeModel);
 
-            // ตั้งค่า Animation Mixer เมื่อโหลดไฟล์สำเร็จ
+            // ใส่ Shader ที่ Awning (กันสาดหน้าร้าน) ชัดเจนและเห็นผลทันที
+            cafeModel.traverse((child) => {
+                if (child.isMesh && child.name === 'Awning') {
+                    child.material = customShaderMaterial;
+                }
+            });
+
+            // ตั้งค่า Animation Mixer เมื่อโหลดไฟล์สำเร็จ (โค้ดเดิมของคุณ)
             if (gltf.animations && gltf.animations.length > 0) {
                 mixer = new THREE.AnimationMixer(cafeModel);
                 
-                // ดึง Animation แรก หรือค้นหาจากชื่อ Animation ที่ตั้งใน Blender
                 const doorClip = gltf.animations.find(clip => clip.name.toLowerCase().includes('door')) || gltf.animations[0];
                 
                 if (doorClip) {
                     doorAction = mixer.clipAction(doorClip);
-                    doorAction.setLoop(THREE.LoopOnce); // เล่นรอบเดียวแล้วหยุด
-                    doorAction.clampWhenFinished = true; // ค้างไว้ตำแหน่งสุดท้ายเมื่อเล่นจบ
+                    doorAction.setLoop(THREE.LoopOnce);
+                    doorAction.clampWhenFinished = true;
                 }
             }
         }, undefined, (error) => {
             console.error('Error loading model:', error);
         });
 
-        // ฟังก์ชันสั่งสลับเปิด/ปิดประตู
+        // ฟังก์ชันสั่งสลับเปิด/ปิดประตู (โค้ดเดิมของคุณ)
         function toggleDoor() {
             if (!doorAction) return;
 
             doorAction.paused = false;
             if (!isDoorOpen) {
-                // เล่น Animation ไปข้างหน้า (เปิดประตู)
                 doorAction.timeScale = 1;
                 doorAction.play();
                 isDoorOpen = true;
             } else {
-                // เล่น Animation ถอยหลัง (ปิดประตู)
                 doorAction.timeScale = -1;
                 doorAction.play();
                 isDoorOpen = false;
@@ -169,20 +208,20 @@
         }
 
         function focusCV() {
+            moveCamera(
+                { x: 0.0, y: 4.5, z: 8.0 }, 
+                { x: 0.0, y: 0.5, z: 1.5 }
+            );
+        }
 
-    moveCamera(
-        { x: 0.0, y: 4.5, z: 8.0 }, 
-        { x: 0.0, y: 0.5, z: 1.5 }
-    );
-}
+        function focusPhoto() {
+            moveCamera(
+                { x: -1.0, y: 3.5, z: 7.0 }, 
+                { x: -1.0, y: 2.0, z: 0.0 }
+            );
+        }
 
-function focusPhoto() {
-    moveCamera(
-        { x: -1.0, y: 3.5, z: 7.0 }, 
-        { x: -1.0, y: 2.0, z: 0.0 }
-    );
-}
-        // คลิกตรวจจับชิ้นส่วนประตูเพื่อเปิด/ปิด
+        // คลิกตรวจจับชิ้นส่วนประตูเพื่อเปิด/ปิด (โค้ดเดิมของคุณ)
         window.addEventListener('click', (event) => {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -209,7 +248,9 @@ function focusPhoto() {
         function animate() {
             requestAnimationFrame(animate);
             
-            // อัปเดตเฟรม Animation mixer ในแต่ละเฟรม
+            // ส่งค่า time ให้ Shader ทำงาน
+            customShaderMaterial.uniforms.time.value = clock.getElapsedTime();
+
             const delta = clock.getDelta();
             if (mixer) mixer.update(delta);
 
