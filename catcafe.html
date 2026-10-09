@@ -63,8 +63,34 @@
         <button class="ui-btn" onclick="toggleDoor()">🚪 เปิด/ปิดประตู</button>
         <button class="ui-btn" onclick="focusPhoto()">🖼️ ซูมรูปโปรไฟล์</button>
         <button class="ui-btn" onclick="focusCV()">📜 ซูมดูประวัติ (CV)</button>
-
     </div>
+
+    <!-- Shader เรืองแสงสีชมพูพาสเทลสำหรับป้าย _catcafe -->
+    <script id="vertexShader" type="x-shader/x-vertex">
+        varying vec2 vUv;
+        varying vec3 vNormal;
+        void main() {
+            vUv = uv;
+            vNormal = normalize(normalMatrix * normal);
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+    </script>
+
+    <script id="fragmentShader" type="x-shader/x-fragment">
+        uniform float time;
+        varying vec2 vUv;
+        varying vec3 vNormal;
+
+        void main() {
+            float glow = 0.85 + 0.15 * sin(time * 2.5 + vUv.y * 3.0);
+            float rim = pow(1.0 - max(0.0, dot(vNormal, vec3(0.0, 0.0, 1.0))), 2.0);
+            
+            vec3 textColor = vec3(1.0, 0.85, 0.92) * glow;
+            vec3 neonRimColor = vec3(1.0, 0.45, 0.7) * rim * 1.5;
+            
+            gl_FragColor = vec4(textColor + neonRimColor, 1.0);
+        }
+    </script>
 
     <script>
         const scene = new THREE.Scene();
@@ -96,6 +122,13 @@
         controls.enableDamping = true;
         controls.target.set(defaultTarget.x, defaultTarget.y, defaultTarget.z);
 
+        // สร้าง Material Shader เรืองแสงสีชมพูพาสเทล
+        const signShaderMaterial = new THREE.ShaderMaterial({
+            vertexShader: document.getElementById('vertexShader').textContent,
+            fragmentShader: document.getElementById('fragmentShader').textContent,
+            uniforms: { time: { value: 0.0 } }
+        });
+
         let cafeModel = null;
         let mixer = null;
         let doorAction = null;
@@ -109,6 +142,16 @@
         loader.load('catcafe.glb', (gltf) => {
             cafeModel = gltf.scene;
             scene.add(cafeModel);
+
+            // ค้นหาวัตถุ _catcafe หรือวัตถุย่อยด้านในกลุ่ม _catcafe เพื่อใส่ Shader
+            cafeModel.traverse((child) => {
+                if (child.isMesh) {
+                    const isUnderCatcafeGroup = child.parent && child.parent.name === '_catcafe';
+                    if (child.name === '_catcafe' || isUnderCatcafeGroup) {
+                        child.material = signShaderMaterial;
+                    }
+                }
+            });
 
             // ตั้งค่า Animation Mixer เมื่อโหลดไฟล์สำเร็จ
             if (gltf.animations && gltf.animations.length > 0) {
@@ -169,19 +212,19 @@
         }
 
         function focusCV() {
+            moveCamera(
+                { x: 0.0, y: 4.5, z: 8.0 }, 
+                { x: 0.0, y: 0.5, z: 1.5 }
+            );
+        }
 
-    moveCamera(
-        { x: 0.0, y: 4.5, z: 8.0 }, 
-        { x: 0.0, y: 0.5, z: 1.5 }
-    );
-}
+        function focusPhoto() {
+            moveCamera(
+                { x: -1.0, y: 3.5, z: 7.0 }, 
+                { x: -1.0, y: 2.0, z: 0.0 }
+            );
+        }
 
-function focusPhoto() {
-    moveCamera(
-        { x: -1.0, y: 3.5, z: 7.0 }, 
-        { x: -1.0, y: 2.0, z: 0.0 }
-    );
-}
         // คลิกตรวจจับชิ้นส่วนประตูเพื่อเปิด/ปิด
         window.addEventListener('click', (event) => {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -209,6 +252,9 @@ function focusPhoto() {
         function animate() {
             requestAnimationFrame(animate);
             
+            // อัปเดตเวลา Shader ให้กระพริบเรืองแสงสวยงาม
+            signShaderMaterial.uniforms.time.value = clock.getElapsedTime();
+
             // อัปเดตเฟรม Animation mixer ในแต่ละเฟรม
             const delta = clock.getDelta();
             if (mixer) mixer.update(delta);
