@@ -65,7 +65,7 @@
         <button class="ui-btn" onclick="focusCV()">📜 ซูมดูประวัติ (CV)</button>
     </div>
 
-    <!-- Custom Shader เฉพาะป้าย CAT CAFE (Warm Gold Glow) -->
+    <!-- Custom Shader เรืองแสงสีทองอมส้ม (Warm Gold Glow) -->
     <script id="vertexShader" type="x-shader/x-vertex">
         varying vec2 vUv;
         varying vec3 vNormal;
@@ -82,11 +82,10 @@
         varying vec3 vNormal;
 
         void main() {
-            // จังหวะแสงกระพริบเรืองแสงสีทองอมส้ม
             float glow = 0.85 + 0.15 * sin(time * 3.0 + vUv.y * 5.0);
             float rim = pow(1.0 - max(0.0, dot(vNormal, vec3(0.0, 0.0, 1.0))), 2.0);
             
-            vec3 goldBase = vec3(1.0, 0.78, 0.2) * glow;
+            vec3 goldBase = vec3(1.0, 0.8, 0.3) * glow;
             vec3 neonRim = vec3(1.0, 0.4, 0.0) * rim * 1.5;
             
             gl_FragColor = vec4(goldBase + neonRim, 1.0);
@@ -111,7 +110,7 @@
         renderer.toneMappingExposure = 1.0;
         document.body.appendChild(renderer.domElement);
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
         scene.add(ambientLight);
 
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -143,40 +142,49 @@
             cafeModel = gltf.scene;
             scene.add(cafeModel);
 
-            // ตรวจจับป้าย CAT CAFE ด้วยตำแหน่งแกน Y/Z เพื่อความแม่นยำ ไม่พึ่งพาแค่ชื่อ Object
+            // วนหาชิ้นส่วนป้าย CAT CAFE โดยใช้ทั้งเงื่อนไขชื่อและพิกัดตำแหน่งจริงบนโมเดล
             cafeModel.traverse((child) => {
                 if (child.isMesh) {
                     const name = child.name.toLowerCase();
-                    const pos = child.getWorldPosition(new THREE.Vector3());
+                    const worldPos = new THREE.Vector3();
+                    child.getWorldPosition(worldPos);
 
-                    // ตรวจจับวัตถุที่เป็นข้อความป้ายหน้าร้าน (แกน Y สูงประมาณ 2.0 - 4.5 และอยู่ด้านหน้า Y/Z)
-                    if (name.includes('cafe') || name.includes('cat') || name.includes('sign') || 
-                       (pos.y > 2.0 && pos.y < 4.5 && pos.z > -1.0 && pos.z < 2.5 && !name.includes('ear') && !name.includes('head') && !name.includes('eye'))) {
-                        
-                        // ปรับ ShaderMaterial เข้าไปที่ป้ายหน้าร้าน
-                        if (name.includes('text') || name.includes('cafe') || name.includes('catcafe') || child.geometry.type.includes('Text')) {
-                            child.material = signShaderMaterial;
-                        }
+                    // ระบุเป้าหมายตัวอักษรป้าย CAT CAFE หน้าร้าน (แกน Y สูงประมาณ 2.2 - 3.8 และอยู่โซนหน้า)
+                    const isSignArea = (worldPos.y >= 2.2 && worldPos.y <= 3.8 && worldPos.z >= -0.5 && worldPos.x >= -3.0 && worldPos.x <= 3.0);
+                    const isNotHeadOrEar = !name.includes('head') && !name.includes('ear') && !name.includes('eye') && !name.includes('paw');
+
+                    if ((name.includes('cafe') || name.includes('catcafe') || name.includes('sign') || isSignArea) && isNotHeadOrEar) {
+                        // ปรับใช้วัสดุ Shader เรืองแสง
+                        child.material = signShaderMaterial;
                     }
                 }
             });
 
+            // ตรวจสอบและตั้งค่า Animation เปิด/ปิดประตู
             if (gltf.animations && gltf.animations.length > 0) {
+                console.log("Found GLTF Animations:", gltf.animations);
                 mixer = new THREE.AnimationMixer(cafeModel);
-                const doorClip = gltf.animations.find(clip => clip.name.toLowerCase().includes('door')) || gltf.animations[0];
+                
+                // ดึง Animation คลิปแรกมาใช้งานโดยตรง
+                const doorClip = gltf.animations[0];
                 
                 if (doorClip) {
                     doorAction = mixer.clipAction(doorClip);
                     doorAction.setLoop(THREE.LoopOnce);
                     doorAction.clampWhenFinished = true;
                 }
+            } else {
+                console.warn("No animation clips found in catcafe.glb");
             }
         }, undefined, (error) => {
             console.error('Error loading model:', error);
         });
 
         function toggleDoor() {
-            if (!doorAction) return;
+            if (!doorAction) {
+                console.warn("Door action is not loaded or missing.");
+                return;
+            }
 
             doorAction.paused = false;
             if (!isDoorOpen) {
@@ -227,6 +235,7 @@
             );
         }
 
+        // คลิกตรวจจับตำแหน่งวัตถุบนฉาก
         window.addEventListener('click', (event) => {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -238,8 +247,11 @@
                 if (intersects.length > 0) {
                     const clickedObj = intersects[0].object;
                     const name = clickedObj.name.toLowerCase();
+                    const worldPos = new THREE.Vector3();
+                    clickedObj.getWorldPosition(worldPos);
 
-                    if (name.includes('door') || name.includes('gate')) {
+                    // หากกดโดนโซนประตูฝั่งขวา หรือวัตถุที่มีชื่อว่า door/gate
+                    if (name.includes('door') || name.includes('gate') || (worldPos.x > 1.0 && worldPos.y < 3.0 && worldPos.z > -1.0)) {
                         toggleDoor();
                     } else if (name.includes('frame') || name.includes('photo') || name.includes('selfie')) {
                         focusPhoto();
