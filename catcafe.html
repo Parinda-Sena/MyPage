@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Interactive Cat Cafe Portfolio</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #2b2622; font-family: 'Segoe UI', sans-serif; }
+        body { margin: 0; overflow: hidden; background-color: #f4ece1; font-family: sans-serif; }
         canvas { display: block; }
         
         .ui-container {
             position: absolute;
-            bottom: 24px;
+            bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
             display: flex;
@@ -19,23 +19,21 @@
         }
 
         .ui-btn {
-            background: linear-gradient(135deg, #8c5a3c, #5c3a26);
+            background-color: #7c523f;
             color: #fff;
-            border: 1px solid rgba(255,255,255,0.2);
-            padding: 12px 20px;
-            border-radius: 25px;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 20px;
             font-size: 14px;
-            font-weight: 600;
+            font-weight: bold;
             cursor: pointer;
-            box-shadow: 0 6px 15px rgba(0,0,0,0.3);
-            transition: all 0.25s ease;
-            backdrop-filter: blur(4px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            transition: transform 0.2s, background-color 0.2s;
         }
 
         .ui-btn:hover {
-            background: linear-gradient(135deg, #a66d49, #734930);
-            transform: translateY(-3px) scale(1.03);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+            background-color: #a06e56;
+            transform: translateY(-2px);
         }
 
         .hint-text {
@@ -43,15 +41,13 @@
             top: 20px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(43, 38, 34, 0.85);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            padding: 10px 20px;
-            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.85);
+            padding: 8px 16px;
+            border-radius: 12px;
             font-size: 13px;
-            color: #f4ece1;
+            color: #5a3d31;
             pointer-events: none;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-            backdrop-filter: blur(6px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -60,16 +56,15 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 </head>
 <body>
-    <div class="hint-text">✨ คลิกที่ประตูเพื่อเปิด/ปิดร้าน หรือใช้ปุ่มด้านล่างเพื่อโฟกัสจุดต่างๆ</div>
+    <div class="hint-text">💡 คลิกที่ประตูเพื่อเปิด/ปิดร้าน หรือกดปุ่มด้านล่างเพื่อสลับมุมมอง</div>
 
     <div class="ui-container">
-        <button class="ui-btn" onclick="focusMainView()">🏠 มุมมองหลัก</button>
         <button class="ui-btn" onclick="toggleDoor()">🚪 เปิด/ปิดประตู</button>
-        <button class="ui-btn" onclick="focusPhoto()">🖼️ รูปโปรไฟล์</button>
-        <button class="ui-btn" onclick="focusCV()">📜 ประวัติ (CV)</button>
+        <button class="ui-btn" onclick="focusPhoto()">🖼️ ซูมรูปโปรไฟล์</button>
+        <button class="ui-btn" onclick="focusCV()">📜 ซูมดูประวัติ (CV)</button>
     </div>
 
-    <!-- Custom Shader เฉพาะป้าย CAT CAFE & Menu -->
+    <!-- Custom Shader เฉพาะป้าย CAT CAFE & ตัวอักษรบนป้ายเมนูดำ -->
     <script id="vertexShader" type="x-shader/x-vertex">
         varying vec2 vUv;
         varying vec3 vNormal;
@@ -86,70 +81,54 @@
         varying vec3 vNormal;
 
         void main() {
-            // จังหวะเรืองแสงนุ่มนวล ไม่จ้าจนแสบตา
+            // คลื่นเรืองแสงนุ่มนวล
             float glow = 0.85 + 0.15 * sin(time * 2.5 + vUv.y * 3.0);
             
-            // แสงขอบ (Rim Light) โทนส้มทอง ให้ตัวอักษรดูมีมิตินูนออกมาจากป้าย
+            // แสงสว่างขอบ (Rim Lighting) โทนส้มทอง เพื่อให้ตัวหนังสือสีขาวเด่นลอยออกมาจากป้ายดำ/ไม้
             float rim = pow(1.0 - max(0.0, dot(vNormal, vec3(0.0, 0.0, 1.0))), 2.0);
             
-            // ตัวอักษรสีขาวนวล ตัดด้วยแสงเรืองโทนส้มทองขอบป้าย
-            vec3 textColor = vec3(1.0, 0.95, 0.88) * glow;
-            vec3 neonRimColor = vec3(1.0, 0.55, 0.15) * rim * 1.2;
+            vec3 textColor = vec3(1.0, 0.98, 0.92) * glow;
+            vec3 neonGlow = vec3(1.0, 0.6, 0.2) * rim * 1.2;
             
-            gl_FragColor = vec4(textColor + neonRimColor, 1.0);
+            gl_FragColor = vec4(textColor + neonGlow, 1.0);
         }
     </script>
 
     <script>
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x362f2d);
+        scene.background = new THREE.Color(0xf4ece1);
 
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const defaultCamPos = { x: 0, y: 7.5, z: 19 };
-        const defaultTarget = { x: 0, y: 2.2, z: 0 };
+        const defaultCamPos = { x: 0, y: 3.5, z: 9 };
+        const defaultTarget = { x: 0, y: 1.2, z: 0 };
         camera.position.set(defaultCamPos.x, defaultCamPos.y, defaultCamPos.z);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setPixelRatio(window.devicePixelRatio);
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         renderer.outputEncoding = THREE.sRGBEncoding;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.15;
+        renderer.toneMappingExposure = 1.0;
         document.body.appendChild(renderer.domElement);
 
-        // ระบบแสงบรรยากาศ
-        const hemiLight = new THREE.HemisphereLight(0xfff0e6, 0x443322, 0.8);
-        scene.add(hemiLight);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
 
-        const dirLight = new THREE.DirectionalLight(0xfffaed, 1.2);
-        dirLight.position.set(6, 12, 8);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(5, 10, 7);
         dirLight.castShadow = true;
-        dirLight.shadow.mapSize.width = 2048;
-        dirLight.shadow.mapSize.height = 2048;
-        dirLight.shadow.bias = -0.0001;
         scene.add(dirLight);
-
-        const pointLight = new THREE.PointLight(0xffaa55, 0.6, 15);
-        pointLight.position.set(0, 4, 6);
-        scene.add(pointLight);
 
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
         controls.target.set(defaultTarget.x, defaultTarget.y, defaultTarget.z);
 
-        // Shader Material สำหรับป้าย CAT CAFE และ Menu เท่านั้น
-        const labelShaderMaterial = new THREE.ShaderMaterial({
+        // สร้าง Custom ShaderMaterial
+        const signShaderMaterial = new THREE.ShaderMaterial({
             vertexShader: document.getElementById('vertexShader').textContent,
             fragmentShader: document.getElementById('fragmentShader').textContent,
             uniforms: { time: { value: 0.0 } }
-        });
-
-        // วัสดุสีดำสำหรับตัวอักษร CV (ไม่มี Shader)
-        const cvBlackMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0x000000 
         });
 
         let cafeModel = null;
@@ -166,47 +145,50 @@
             cafeModel = gltf.scene;
             scene.add(cafeModel);
 
+            // ใส่ Shader เฉพาะป้าย CAT CAFE และ ตัวอักษรรายการบนป้ายเมนูดำ
             cafeModel.traverse((child) => {
                 if (child.isMesh) {
-                    child.castShadow = true;
-                    child.receiveShadow = true;
-                    
                     const name = child.name.toLowerCase();
 
-                    // 1. ใส่ Shader เรืองแสงเฉพาะป้าย CAT CAFE และ เมนู
-                    if (name.includes('cafe') || name.includes('menu') || name.includes('latte') || name.includes('sign')) {
-                        child.material = labelShaderMaterial;
-                    } 
-                    // 2. ตัวหนังสือ CV ทั้งหมดปรับเป็นสีดำบริสุทธิ์ ไม่มี Shader
-                    else if (name.includes('cv') || name.includes('text') || name.includes('parinda') || name.includes('education') || name.includes('age') || name.includes('faculty') || name.includes('kasetsart')) {
-                        child.material = cvBlackMaterial;
+                    // ค้นหาเฉพาะตัวอักษรป้าย CAT CAFE และ ตัวอักษรบนป้ายเมนูดำ (เช่น Menu, Matcha, Latte)
+                    if (name.includes('cafe') || name.includes('menu') || name.includes('latte') || 
+                        name.includes('cappuccino') || name.includes('matcha') || name.includes('cocoa') || 
+                        name.includes('hawaii') || name.includes('frappe') || name.includes('sign')) {
+                        child.material = signShaderMaterial;
                     }
+                    // ข้อความ CV จะคงสีน้ำเงินดั้งเดิมจากโมเดลไว้เหมือนเดิม ไม่โดนเปลี่ยน
                 }
             });
 
-            // ตั้งค่า Animation ประตู
+            // ตั้งค่า Animation Mixer เมื่อโหลดไฟล์สำเร็จ
             if (gltf.animations && gltf.animations.length > 0) {
                 mixer = new THREE.AnimationMixer(cafeModel);
-                const doorClip = gltf.animations.find(clip => 
-                    clip.name.toLowerCase().includes('door') || clip.name.toLowerCase().includes('gate')
-                ) || gltf.animations[0];
-
+                
+                // ดึง Animation แรก หรือค้นหาจากชื่อ Animation ที่ตั้งใน Blender
+                const doorClip = gltf.animations.find(clip => clip.name.toLowerCase().includes('door')) || gltf.animations[0];
+                
                 if (doorClip) {
                     doorAction = mixer.clipAction(doorClip);
-                    doorAction.setLoop(THREE.LoopOnce);
-                    doorAction.clampWhenFinished = true;
+                    doorAction.setLoop(THREE.LoopOnce); // เล่นรอบเดียวแล้วหยุด
+                    doorAction.clampWhenFinished = true; // ค้างไว้ตำแหน่งสุดท้ายเมื่อเล่นจบ
                 }
             }
-        }, undefined, (error) => console.error(error));
+        }, undefined, (error) => {
+            console.error('Error loading model:', error);
+        });
 
+        // ฟังก์ชันสั่งสลับเปิด/ปิดประตู
         function toggleDoor() {
             if (!doorAction) return;
+
             doorAction.paused = false;
             if (!isDoorOpen) {
+                // เล่น Animation ไปข้างหน้า (เปิดประตู)
                 doorAction.timeScale = 1;
                 doorAction.play();
                 isDoorOpen = true;
             } else {
+                // เล่น Animation ถอยหลัง (ปิดประตู)
                 doorAction.timeScale = -1;
                 doorAction.play();
                 isDoorOpen = false;
@@ -215,49 +197,69 @@
 
         function moveCamera(targetCamPos, targetLookAt) {
             gsap.to(camera.position, {
-                x: targetCamPos.x, y: targetCamPos.y, z: targetCamPos.z,
-                duration: 1.6, ease: "power2.inOut"
+                x: targetCamPos.x,
+                y: targetCamPos.y,
+                z: targetCamPos.z,
+                duration: 1.8,
+                ease: "power2.inOut"
             });
+
             gsap.to(controls.target, {
-                x: targetLookAt.x, y: targetLookAt.y, z: targetLookAt.z,
-                duration: 1.6, ease: "power2.inOut",
+                x: targetLookAt.x,
+                y: targetLookAt.y,
+                z: targetLookAt.z,
+                duration: 1.8,
+                ease: "power2.inOut",
                 onUpdate: () => controls.update()
             });
         }
 
-        function focusMainView() {
-            moveCamera(defaultCamPos, defaultTarget);
-        }
-
         function focusCV() {
-            moveCamera({ x: 0.0, y: 6.5, z: 10.5 }, { x: 0.0, y: 0.4, z: 2.2 });
+            moveCamera(
+                { x: 0.0, y: 4.5, z: 8.0 }, 
+                { x: 0.0, y: 0.5, z: 1.5 }
+            );
         }
 
         function focusPhoto() {
-            moveCamera({ x: -1.2, y: 2.4, z: 7.5 }, { x: -1.2, y: 2.1, z: 0.0 });
+            moveCamera(
+                { x: -1.0, y: 3.5, z: 7.0 }, 
+                { x: -1.0, y: 2.0, z: 0.0 }
+            );
         }
 
+        // คลิกตรวจจับชิ้นส่วนประตูเพื่อเปิด/ปิด
         window.addEventListener('click', (event) => {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
             raycaster.setFromCamera(mouse, camera);
             
             if (cafeModel) {
                 const intersects = raycaster.intersectObjects(cafeModel.children, true);
                 if (intersects.length > 0) {
-                    const name = intersects[0].object.name.toLowerCase();
-                    if (name.includes('door') || name.includes('gate')) toggleDoor();
-                    else if (name.includes('frame') || name.includes('photo')) focusPhoto();
-                    else if (name.includes('cv') || name.includes('text')) focusCV();
+                    const clickedObj = intersects[0].object;
+                    const name = clickedObj.name.toLowerCase();
+
+                    if (name.includes('door') || name.includes('gate')) {
+                        toggleDoor();
+                    } else if (name.includes('frame') || name.includes('photo') || name.includes('selfie')) {
+                        focusPhoto();
+                    } else if (name.includes('cv') || name.includes('text')) {
+                        focusCV();
+                    }
                 }
             }
         });
 
         function animate() {
             requestAnimationFrame(animate);
+            
             const delta = clock.getDelta();
             
-            labelShaderMaterial.uniforms.time.value = clock.getElapsedTime();
+            // อัปเดตเวลาให้ Custom Shader ทำงาน
+            signShaderMaterial.uniforms.time.value = clock.getElapsedTime();
+
             if (mixer) mixer.update(delta);
 
             controls.update();
