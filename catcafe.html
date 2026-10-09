@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -110,7 +111,6 @@
     </div>
 
     <!-- VERTEX SHADER -->
-
     <script id="vertexShader" type="x-shader/x-vertex">
         varying vec2 vUv;
         varying vec3 vNormal;
@@ -127,7 +127,6 @@
     </script>
 
     <!-- FRAGMENT SHADER -->
-
     <script id="fragmentShader" type="x-shader/x-fragment">
         uniform float time;
 
@@ -166,7 +165,6 @@
         // =========================================
 
         const scene = new THREE.Scene();
-
         scene.background = new THREE.Color(0xf4ece1);
 
         const camera = new THREE.PerspectiveCamera(
@@ -236,7 +234,6 @@
 
         dirLight.position.set(5, 10, 7);
         dirLight.castShadow = true;
-
         scene.add(dirLight);
 
         // =========================================
@@ -250,7 +247,6 @@
 
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
-
         controls.minDistance = 3;
         controls.maxDistance = 30;
 
@@ -281,18 +277,121 @@
         });
 
         // =========================================
-        // MODEL VARIABLES
+        // MODEL AND ANIMATION VARIABLES
         // =========================================
 
         let cafeModel = null;
         let mixer = null;
-        let doorAction = null;
+
+        let openAction = null;
+        let closeAction = null;
+
         let isDoorOpen = false;
+        let isDoorAnimating = false;
 
         const clock = new THREE.Clock();
 
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
+
+        // =========================================
+        // ANIMATION SETUP
+        // =========================================
+
+        function setupDoorAnimations(gltf) {
+            console.log('========== ANIMATION DETAILS ==========');
+
+            console.log(
+                'Animation names:',
+                gltf.animations.map(function (clip) {
+                    return clip.name;
+                })
+            );
+
+            gltf.animations.forEach(function (clip) {
+                console.log('Animation:', clip.name);
+                console.log('Duration:', clip.duration);
+
+                console.log(
+                    'Tracks:',
+                    clip.tracks.map(function (track) {
+                        return track.name;
+                    })
+                );
+            });
+
+            const openClip = gltf.animations.find(
+                function (clip) {
+                    return clip.name.trim().toLowerCase() === 'open';
+                }
+            );
+
+            const closeClip = gltf.animations.find(
+                function (clip) {
+                    return clip.name.trim().toLowerCase() === 'close';
+                }
+            );
+
+            if (!openClip || !closeClip) {
+                console.error(
+                    'ต้องพบ Animation ชื่อ open และ close',
+                    {
+                        openFound: Boolean(openClip),
+                        closeFound: Boolean(closeClip),
+                        available: gltf.animations.map(function (clip) {
+                            return clip.name;
+                        })
+                    }
+                );
+
+                return;
+            }
+
+            mixer = new THREE.AnimationMixer(cafeModel);
+
+            openAction = mixer.clipAction(openClip);
+            closeAction = mixer.clipAction(closeClip);
+
+            [openAction, closeAction].forEach(function (action) {
+                action.setLoop(THREE.LoopOnce, 1);
+                action.clampWhenFinished = true;
+                action.enabled = true;
+                action.stop();
+            });
+
+            // เริ่มจากสถานะปิด โดยประเมินเฟรมแรกของ open
+            openAction.reset();
+            openAction.play();
+            openAction.paused = true;
+            openAction.time = 0;
+
+            mixer.update(0);
+
+            openAction.stop();
+
+            isDoorOpen = false;
+            isDoorAnimating = false;
+
+            mixer.addEventListener('finished', function (event) {
+                if (
+                    event.action === openAction ||
+                    event.action === closeAction
+                ) {
+                    isDoorAnimating = false;
+
+                    console.log(
+                        'Door animation finished:',
+                        event.action.getClip().name
+                    );
+                }
+            });
+
+            console.log(
+                'Door animations ready:',
+                openClip.name,
+                closeClip.name
+            );
+        }
 
         // =========================================
         // LOAD GLB
@@ -305,12 +404,10 @@
 
             function (gltf) {
                 cafeModel = gltf.scene;
-
                 scene.add(cafeModel);
 
                 console.log('GLB model loaded.');
 
-                // ตรวจสอบชื่อ Mesh
                 cafeModel.traverse(function (child) {
                     if (!child.isMesh) {
                         return;
@@ -326,7 +423,6 @@
                     child.castShadow = true;
                     child.receiveShadow = true;
 
-                    // Shader สีชมพูสำหรับ Awning
                     if (child.name === 'Awning') {
                         child.material = pinkShaderMaterial;
 
@@ -337,70 +433,7 @@
                     }
                 });
 
-                // =================================
-                // INSPECT ANIMATIONS
-                // =================================
-
-                console.log(
-                    'Animation names:',
-                    gltf.animations.map(function (clip) {
-                        return clip.name;
-                    })
-                );
-
-                // =================================
-                // SET UP DOOR ANIMATION
-                // =================================
-
-                if (
-                    gltf.animations &&
-                    gltf.animations.length > 0
-                ) {
-                    mixer = new THREE.AnimationMixer(cafeModel);
-
-                    const doorClip = gltf.animations.find(
-                        function (clip) {
-                            return /door|gate/i.test(clip.name);
-                        }
-                    );
-
-                    if (doorClip) {
-                        doorAction = mixer.clipAction(doorClip);
-
-                        doorAction.setLoop(
-                            THREE.LoopOnce,
-                            1
-                        );
-
-                        doorAction.clampWhenFinished = true;
-
-                        doorAction.reset();
-                        doorAction.play();
-                        doorAction.paused = true;
-                        doorAction.time = 0;
-
-                        mixer.update(0);
-
-                        console.log(
-                            'Door animation ready:',
-                            doorClip.name,
-                            'Duration:',
-                            doorClip.duration
-                        );
-                    } else {
-                        console.warn(
-                            'No animation name contains door or gate.'
-                        );
-
-                        console.warn(
-                            'Check Animation names in the Console.'
-                        );
-                    }
-                } else {
-                    console.warn(
-                        'No animations found in catcafe.glb.'
-                    );
-                }
+                setupDoorAnimations(gltf);
             },
 
             function (progress) {
@@ -423,43 +456,44 @@
         );
 
         // =========================================
-        // TOGGLE DOOR
+        // PLAY DOOR ANIMATION
         // =========================================
 
         function toggleDoor() {
-            if (!doorAction) {
+            if (!openAction || !closeAction || !mixer) {
                 console.warn(
-                    'Door animation is unavailable.'
+                    'Animation open/close is unavailable. Check Console.'
                 );
-
                 return;
             }
 
-            const duration = doorAction.getClip().duration;
+            if (isDoorAnimating) {
+                console.log('Door animation is still playing.');
+                return;
+            }
 
-            doorAction.enabled = true;
-            doorAction.paused = false;
+            isDoorAnimating = true;
 
             if (!isDoorOpen) {
-                // เปิดประตู
-                if (doorAction.time >= duration) {
-                    doorAction.time = 0;
-                }
+                closeAction.stop();
 
-                doorAction.timeScale = 1;
-                doorAction.play();
+                openAction.reset();
+                openAction.enabled = true;
+                openAction.setEffectiveTimeScale(1);
+                openAction.setEffectiveWeight(1);
+                openAction.play();
 
                 isDoorOpen = true;
 
                 console.log('Opening door');
             } else {
-                // ปิดประตู
-                if (doorAction.time <= 0) {
-                    doorAction.time = duration;
-                }
+                openAction.stop();
 
-                doorAction.timeScale = -1;
-                doorAction.play();
+                closeAction.reset();
+                closeAction.enabled = true;
+                closeAction.setEffectiveTimeScale(1);
+                closeAction.setEffectiveWeight(1);
+                closeAction.play();
 
                 isDoorOpen = false;
 
@@ -471,10 +505,7 @@
         // CAMERA MOVEMENT
         // =========================================
 
-        function moveCamera(
-            targetCamPos,
-            targetLookAt
-        ) {
+        function moveCamera(targetCamPos, targetLookAt) {
             gsap.killTweensOf(camera.position);
             gsap.killTweensOf(controls.target);
 
@@ -500,10 +531,7 @@
         // =========================================
 
         function focusMainView() {
-            moveCamera(
-                defaultCamPos,
-                defaultTarget
-            );
+            moveCamera(defaultCamPos, defaultTarget);
         }
 
         function focusCV() {
@@ -541,7 +569,6 @@
         // =========================================
 
         window.addEventListener('click', function (event) {
-            // ไม่ตรวจการคลิกปุ่ม UI ซ้ำ
             if (
                 event.target.closest('.ui-container') ||
                 event.target.closest('.hint-text')
@@ -570,21 +597,15 @@
                 return;
             }
 
-            // ตรวจ Mesh ที่ใกล้กล้องที่สุดก่อน
             const obj = intersects[0].object;
 
-            const name = obj.name.toLowerCase();
+            let current = obj;
+            let fullName = '';
 
-            let parent = obj.parent;
-            let parentNames = '';
-
-            // ตรวจชื่อ Parent ย้อนขึ้นไป
-            while (parent && parent !== cafeModel) {
-                parentNames += ' ' + parent.name.toLowerCase();
-                parent = parent.parent;
+            while (current && current !== cafeModel) {
+                fullName += ' ' + current.name.toLowerCase();
+                current = current.parent;
             }
-
-            const fullName = name + ' ' + parentNames;
 
             console.log('Clicked mesh:', obj.name);
 
@@ -615,10 +636,7 @@
 
             controls.update();
 
-            renderer.render(
-                scene,
-                camera
-            );
+            renderer.render(scene, camera);
         }
 
         animate();
